@@ -33,11 +33,21 @@ fi
 # real server: DI resolved, the startup service ran, and -- the assumption most worth checking --
 # SQLite resolved to the SERVER's Microsoft.Data.Sqlite and its native e_sqlite3, since the plugin
 # deliberately ships neither. If that fallback broke, this line is what goes missing.
-if ! grep -qE "Flynn database ready at schema version [0-9]+" <<< "$LOG"; then
-  echo "::error::Flynn loaded but its database never came up. If the plugin ships no SQLite binary,"
-  echo "::error::this is the load-context fallback to the server's copy failing."
-  exit 1
-fi
+#
+# Polled, not asserted once. The server answers /System/Info/Public before the plugin's hosted
+# services have finished, so a single check races them: it passed with 0.6s of slack on one run
+# and failed with 0.2s on the next. Waiting for the condition is the fix; widening a sleep is not.
+DB_READY="Flynn database ready at schema version [0-9]+"
+for _ in $(seq 1 60); do
+  if grep -qE "$DB_READY" <<< "$LOG"; then
+    grep -E "$DB_READY" <<< "$LOG"
+    echo "Flynn loaded cleanly on $CONTAINER and its database is up."
+    exit 0
+  fi
+  sleep 1
+  LOG="$(docker logs "$CONTAINER" 2>&1)"
+done
 
-grep -E "Flynn database ready at schema version [0-9]+" <<< "$LOG"
-echo "Flynn loaded cleanly on $CONTAINER and its database is up."
+echo "::error::Flynn loaded but its database never came up within 60s. If the plugin ships no"
+echo "::error::SQLite binary, this is the load-context fallback to the server's copy failing."
+exit 1
