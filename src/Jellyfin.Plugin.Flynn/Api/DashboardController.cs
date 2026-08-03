@@ -1,0 +1,210 @@
+using Jellyfin.Plugin.Flynn.Core.Config;
+using Jellyfin.Plugin.Flynn.Core.Data;
+using Jellyfin.Plugin.Flynn.Core.Issues;
+using Jellyfin.Plugin.Flynn.Core.Localization;
+using Jellyfin.Plugin.Flynn.Core.Modules;
+using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Http;
+using Microsoft.AspNetCore.Mvc;
+
+namespace Jellyfin.Plugin.Flynn.Api;
+
+/// <summary>
+/// What the admin page reads: one card per module, and the issue inbox.
+/// <para>
+/// Text is resolved here rather than where it was produced, so the answer is in the reader's
+/// language instead of whatever culture the nightly task happened to run under.
+/// </para>
+/// </summary>
+[ApiController]
+[Route("Flynn")]
+[Authorize(Policy = "RequiresElevation")]
+[Produces("application/json")]
+public sealed class DashboardController : ControllerBase
+{
+    private readonly ModuleRegistry _modules;
+    private readonly IssueRegistry _issues;
+    private readonly ConfigStore _config;
+    private readonly DatabaseReadiness _readiness;
+
+    /// <summary>Initializes a new instance of the <see cref="DashboardController"/> class.</summary>
+    /// <param name="modules">The module registry.</param>
+    /// <param name="issues">The issue registry.</param>
+    /// <param name="config">The configuration store.</param>
+    /// <param name="readiness">Whether storage came up.</param>
+    public DashboardController(
+        ModuleRegistry modules,
+        IssueRegistry issues,
+        ConfigStore config,
+        DatabaseReadiness readiness)
+    {
+        _modules = modules;
+        _issues = issues;
+        _config = config;
+        _readiness = readiness;
+    }
+
+    /// <summary>Returns one card per registered module.</summary>
+    /// <param name="cancellationToken">Cancellation token.</param>
+    /// <returns>The dashboard.</returns>
+    [HttpGet("modules")]
+    public async Task<ActionResult<DashboardDto>> GetModules(CancellationToken cancellationToken)
+    {
+        var strings = FlynnStrings.ForCulture(RequestCulture.For(Request));
+        var enabled = _config.Current.Modules;
+
+        var cards = await _modules.BuildCardsAsync(
+            id => enabled.FirstOrDefault(m => m.Id == id)?.Enabled ?? false,
+            cancellationToken).ConfigureAwait(false);
+
+        var dtos = cards.Select(card =>
+        {
+            var module = _modules.Modules.First(m => m.Id == card.ModuleId);
+            return new ModuleCardDto(
+                card.ModuleId,
+                module.DisplayName,
+                module.Summary,
+                card.State.ToString(),
+                card.Headline.Resolve(strings),
+                card.Detail?.Resolve(strings),
+                card.GeneratedAt);
+        }).ToList();
+
+        return new DashboardDto(dtos, _readiness.IsReady, _readiness.Failure);
+    }
+
+    /// <summary>
+    /// Returns the issues asking for attention, plus how many are being withheld.
+    /// <para>
+    /// The counts are not decoration. Dismissal is permanent, and a permanent hide with no visible
+    /// trace is how a real problem stays hidden for a year.
+    /// </para>
+    /// </summary>
+    /// <param name="cancellationToken">Cancellation token.</param>
+    /// <returns>The inbox.</returns>
+    [HttpGet("issues")]
+    public async Task<ActionResult<InboxDto>> GetIssues(CancellationToken cancellationToken)
+    {
+        if (!_readiness.IsReady)
+        {
+            return StatusCode(
+                StatusCodes.Status503ServiceUnavailable,
+                new ProblemDetails { Title = _readiness.Failure ?? "Storage is unavailable." });
+        }
+
+        var strings = FlynnStrings.ForCulture(RequestCulture.For(Request));
+        var open = await _issues.GetOpenAsync(cancellationToken).ConfigureAwait(false);
+        var counts = await _issues.CountByStateAsync(cancellationToken).ConfigureAwait(false);
+
+        var dtos = open.Select(tracked => new IssueDto(
+            tracked.Issue.Fingerprint,
+            tracked.Issue.ModuleId,
+            tracked.Issue.Severity.ToString(),
+            tracked.Issue.Title.Resolve(strings),
+            tracked.Issue.Detail?.Resolve(strings),
+            tracked.FirstSeen,
+            tracked.LastSeen)).ToList();
+
+        return new InboxDto(
+            dtos,
+            counts.GetValueOrDefault(IssueState.Dismissed),
+            counts.GetValueOrDefault(IssueState.Snoozed),
+            counts.GetValueOrDefault(IssueState.Resolved));
+    }
+
+    /// <summary>Stops an issue from ever coming back on its own.</summary>
+    /// <param name="fingerprint">The issue's identity.</param>
+    /// <param name="cancellationToken">Cancellation token.</param>
+    /// <returns>No content, or 404 when the fingerprint is unknown.</returns>
+    [HttpPost("issues/{fingerprint}/dismiss")]
+    public async Task<ActionResult> DismissIssue(string fingerprint, CancellationToken cancellationToken) =>
+        await _issues.DismissAsync(fingerprint, cancellationToken).ConfigureAwait(false)
+            ? NoContent()
+            : NotFound();
+
+    /// <summary>Hides an issue for a while.</summary>
+    /// <param name="fingerprint">The issue's identity.</param>
+    /// <param name="days">How many days to hide it for.</param>
+    /// <param name="cancellationToken">Cancellation token.</param>
+    /// <returns>No content, or 404 when the fingerprint is unknown.</returns>
+    [HttpPost("issues/{fingerprint}/snooze")]
+    public async Task<ActionResult> SnoozeIssue(
+        string fingerprint,
+        [FromQuery] int days,
+        CancellationToken cancellationToken)
+    {
+        if (days is < 1 or > 365)
+        {
+            return BadRequest(new ProblemDetails { Title = "Snooze must be between 1 and 365 days." });
+        }
+
+        return await _issues.SnoozeAsync(fingerprint, DateTimeOffset.UtcNow.AddDays(days), cancellationToken)
+            .ConfigureAwait(false)
+            ? NoContent()
+            : NotFound();
+    }
+
+    /// <summary>Brings a dismissed or snoozed issue back.</summary>
+    /// <param name="fingerprint">The issue's identity.</param>
+    /// <param name="cancellationToken">Cancellation token.</param>
+    /// <returns>No content, or 404 when the fingerprint is unknown.</returns>
+    [HttpPost("issues/{fingerprint}/restore")]
+    public async Task<ActionResult> RestoreIssue(string fingerprint, CancellationToken cancellationToken) =>
+        await _issues.RestoreAsync(fingerprint, cancellationToken).ConfigureAwait(false)
+            ? NoContent()
+            : NotFound();
+}
+
+/// <summary>The dashboard, as the admin page receives it.</summary>
+/// <param name="Modules">One card per registered module.</param>
+/// <param name="StorageReady">Whether Flynn's own database came up.</param>
+/// <param name="StorageFailure">Why it did not, when it did not.</param>
+public sealed record DashboardDto(
+    IReadOnlyList<ModuleCardDto> Modules,
+    bool StorageReady,
+    string? StorageFailure);
+
+/// <summary>One module's card, with its text already in the reader's language.</summary>
+/// <param name="Id">Module id.</param>
+/// <param name="Name">Display name.</param>
+/// <param name="Summary">One line about what the module does.</param>
+/// <param name="State">Disabled, Healthy, Degraded or Failed.</param>
+/// <param name="Headline">The single most useful value.</param>
+/// <param name="Detail">Secondary line, if any.</param>
+/// <param name="GeneratedAt">When the underlying data was computed.</param>
+public sealed record ModuleCardDto(
+    string Id,
+    string Name,
+    string Summary,
+    string State,
+    string Headline,
+    string? Detail,
+    DateTimeOffset GeneratedAt);
+
+/// <summary>The issue inbox.</summary>
+/// <param name="Open">Issues asking for attention, worst first.</param>
+/// <param name="Dismissed">How many the admin chose never to see again.</param>
+/// <param name="Snoozed">How many are hidden until a date.</param>
+/// <param name="Resolved">How many closed themselves.</param>
+public sealed record InboxDto(
+    IReadOnlyList<IssueDto> Open,
+    int Dismissed,
+    int Snoozed,
+    int Resolved);
+
+/// <summary>One issue, with its text already in the reader's language.</summary>
+/// <param name="Fingerprint">Stable identity, used by the dismiss and snooze endpoints.</param>
+/// <param name="ModuleId">Which module found it.</param>
+/// <param name="Severity">Info, Warning or Critical.</param>
+/// <param name="Title">One line.</param>
+/// <param name="Detail">Longer explanation, if any.</param>
+/// <param name="FirstSeen">When it was first detected.</param>
+/// <param name="LastSeen">When it was last detected.</param>
+public sealed record IssueDto(
+    string Fingerprint,
+    string ModuleId,
+    string Severity,
+    string Title,
+    string? Detail,
+    DateTimeOffset FirstSeen,
+    DateTimeOffset LastSeen);

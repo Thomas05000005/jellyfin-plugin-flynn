@@ -1,14 +1,33 @@
-<!-- Admin shell. Intentionally almost empty: the page is rendered client-side from the module
-     registry so that adding a module never means editing this file. -->
-<div id="FlynnConfigPage" data-role="page" class="page type-interior pluginConfigurationPage"
-     data-controller="__plugin/flynn.js">
+<!-- Admin shell. Intentionally almost empty: everything below is rendered from what the server
+     reports, so adding a module never means editing this file.
+
+     The script and stylesheet are referenced by URL rather than inlined because a browser sends no
+     authorization header for these tags. They carry no data; every call they make afterwards hits
+     an endpoint that checks for elevation. -->
+<div id="FlynnConfigPage" data-role="page" class="page type-interior pluginConfigurationPage">
   <div data-role="content">
     <div class="content-primary">
+
+      <link rel="stylesheet" href="/Flynn/admin.css" />
+
       <div class="verticalSection">
         <h2 class="sectionTitle">Flynn</h2>
-        <p class="fieldDescription">Du cote des utilisateurs.</p>
+        <p class="fieldDescription">He fights for the Users.</p>
       </div>
-      <div id="flynnModuleCards" class="verticalSection"></div>
+
+      <div class="verticalSection">
+        <h3 class="sectionTitle">Modules</h3>
+        <div id="flynnModuleCards" class="flynn-grid">
+          <p class="fieldDescription">Loading...</p>
+        </div>
+      </div>
+
+      <div class="verticalSection">
+        <h3 class="sectionTitle">Needs your attention</h3>
+        <div id="flynnIssues"></div>
+      </div>
+
+      <script src="/Flynn/admin.js" defer></script>
     </div>
   </div>
 </div>

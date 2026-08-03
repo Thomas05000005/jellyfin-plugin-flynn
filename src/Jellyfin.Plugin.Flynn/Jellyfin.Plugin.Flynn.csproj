@@ -24,7 +24,11 @@
       the completeness tests compare the embedded set against AvailableLanguages.
     -->
     <EmbeddedResource Include="Strings\*.json" />
+    <!-- Everything the browser downloads, embedded. Wildcards so adding a file is one
+         step, and the assets controller names each resource explicitly. -->
     <EmbeddedResource Include="Client/runtime/*.js" />
+    <EmbeddedResource Include="Client/admin/*.js" />
+    <EmbeddedResource Include="Client/admin/*.css" />
   </ItemGroup>
 
   <ItemGroup>

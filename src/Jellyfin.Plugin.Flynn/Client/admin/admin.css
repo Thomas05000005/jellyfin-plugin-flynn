@@ -1,0 +1,98 @@
+/*
+ * Flynn admin page styles.
+ *
+ * Colours come from Jellyfin's own theme variables wherever one exists, with a fallback. Hard
+ * coding white text was a real bug class in the previous plugin: it looked fine in the default
+ * dark theme and was unreadable in every light one.
+ */
+
+.flynn-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(16rem, 1fr));
+    gap: 0.75rem;
+    margin: 0.5rem 0 1.5rem;
+}
+
+.flynn-card,
+.flynn-issue {
+    border: 1px solid var(--divider-color, rgba(127, 127, 127, 0.35));
+    border-radius: 0.35rem;
+    padding: 0.75rem 0.9rem;
+    color: inherit;
+    background: rgba(127, 127, 127, 0.06);
+}
+
+.flynn-card-head {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 0.5rem;
+    font-weight: 600;
+}
+
+.flynn-state {
+    font-size: 0.72rem;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    opacity: 0.75;
+}
+
+.flynn-card-headline {
+    font-size: 1.5rem;
+    line-height: 1.2;
+    margin: 0.35rem 0;
+}
+
+.flynn-card-detail,
+.flynn-issue-detail {
+    font-size: 0.85rem;
+    /* 0.7 rather than the 0.45 the previous plugin used: below that it fails WCAG AA on the
+       default surface, and helper text is exactly the text people need most. */
+    opacity: 0.7;
+}
+
+.flynn-card-foot,
+.flynn-issue-foot {
+    margin-top: 0.5rem;
+    font-size: 0.75rem;
+    opacity: 0.7;
+}
+
+/* State is carried by a left edge rather than by the whole background, so the text keeps the
+   theme's own contrast instead of sitting on a colour we chose. */
+.flynn-healthy {
+    border-left: 3px solid var(--flynn-ok, #2aa198);
+}
+
+.flynn-degraded,
+.flynn-warning {
+    border-left: 3px solid var(--flynn-warn, #d38c00);
+}
+
+.flynn-failed,
+.flynn-critical {
+    border-left: 3px solid var(--flynn-bad, #c1443c);
+}
+
+.flynn-disabled {
+    border-left: 3px solid transparent;
+    opacity: 0.6;
+}
+
+.flynn-info {
+    border-left: 3px solid var(--flynn-info, #4b7bd4);
+}
+
+.flynn-issue {
+    margin-bottom: 0.5rem;
+}
+
+.flynn-issue-title {
+    font-weight: 600;
+}
+
+.flynn-withheld {
+    margin-top: 0.75rem;
+    font-size: 0.8rem;
+    opacity: 0.7;
+}

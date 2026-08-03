@@ -62,4 +62,21 @@ if grep -q "$MARKER" <<< "$json"; then
 fi
 echo "  /System/Info/Public: untouched"
 
+# The admin page pulls these two by URL. A 404 here is a config page that loads and then does
+# nothing, which looks like a broken plugin rather than a missing file.
+for asset in "/Flynn/admin.js" "/Flynn/admin.css"; do
+  code="$(curl -s -o /dev/null -w '%{http_code}' --max-time 30 "${BASE}${asset}")"
+  [ "$code" = "200" ] || fail "${asset} answered ${code}; the admin page would load without it."
+  echo "  ${asset}: 200"
+done
+
+# Security, not delivery. The asset endpoints are anonymous by necessity because a browser sends
+# no authorization header for a script tag, and it would be easy to let that spread to the
+# endpoints that actually return data. Anything but 200 is fine here; 200 is not.
+for guarded in "/Flynn/modules" "/Flynn/issues"; do
+  code="$(curl -s -o /dev/null -w '%{http_code}' --max-time 30 "${BASE}${guarded}")"
+  [ "$code" != "200" ] || fail "${guarded} answered 200 without authentication."
+  echo "  ${guarded}: ${code} without auth, as it should be"
+done
+
 echo "Flynn client delivery verified on ${BASE}."
