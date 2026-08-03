@@ -41,5 +41,30 @@ public static class Migrations
             CREATE INDEX ix_storage_device_snapshot_device
                 ON storage_device_snapshot (device_id, taken_at);
             """),
+
+        new Migration(
+            2,
+            "issue registry",
+            """
+            CREATE TABLE issue (
+                fingerprint   TEXT    NOT NULL PRIMARY KEY,
+                module_id     TEXT    NOT NULL,
+                kind          TEXT    NOT NULL,
+                subject       TEXT    NOT NULL,
+                severity      INTEGER NOT NULL,
+                title_key     TEXT    NOT NULL,
+                title_args    TEXT    NOT NULL,
+                detail_key    TEXT        NULL,
+                detail_args   TEXT        NULL,
+                state         INTEGER NOT NULL,
+                first_seen    TEXT    NOT NULL,
+                last_seen     TEXT    NOT NULL,
+                snoozed_until TEXT        NULL
+            );
+
+            CREATE INDEX ix_issue_scope ON issue (module_id, kind, state);
+
+            CREATE INDEX ix_issue_state ON issue (state, severity);
+            """),
     ];
 }

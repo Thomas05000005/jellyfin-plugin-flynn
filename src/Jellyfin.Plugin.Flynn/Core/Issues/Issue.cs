@@ -1,3 +1,5 @@
+using Jellyfin.Plugin.Flynn.Core.Localization;
+
 namespace Jellyfin.Plugin.Flynn.Core.Issues;
 
 /// <summary>How loudly an issue asks to be dealt with.</summary>
@@ -57,8 +59,8 @@ public sealed record Issue(
     string Kind,
     string Subject,
     IssueSeverity Severity,
-    string Title,
-    string? Detail)
+    LocalizedText Title,
+    LocalizedText? Detail)
 {
     /// <summary>
     /// Gets the stable identity of this issue.
