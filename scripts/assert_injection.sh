@@ -35,8 +35,24 @@ done
 src="$(grep -o 'src="/Flynn/client\.js?v=[^"]*"' <<< "$(curl -fsSL --max-time 30 "${BASE}/web/index.html")" | head -1 | sed 's/^src="//; s/"$//')"
 [ -n "$src" ] || fail "Could not read the script src out of the rewritten document."
 
-status="$(curl -s -o /dev/null -w '%{http_code}' --max-time 30 "${BASE}${src}")"
-[ "$status" = "200" ] || fail "${src} answered ${status}; the injected tag points at nothing."
+# Retried, for the same reason the database check is: the server answers the SPA shell before its
+# API pipeline is fully up, and a single probe races that. If it never comes good, the response is
+# dumped rather than reduced to a status code, because 503 from a warming server and 503 from a
+# route that does not exist need different fixes.
+status=""
+for _ in $(seq 1 30); do
+  status="$(curl -s -o /dev/null -w '%{http_code}' --max-time 30 "${BASE}${src}")"
+  [ "$status" = "200" ] && break
+  sleep 2
+done
+
+if [ "$status" != "200" ]; then
+  echo "--- response from ${src} ---"
+  curl -s -i --max-time 30 "${BASE}${src}" | head -30 || true
+  echo "--- routes the server knows about (first 40) ---"
+  curl -s --max-time 30 "${BASE}/System/Info/Public" | head -5 || true
+  fail "${src} answered ${status}; the injected tag points at nothing."
+fi
 echo "  ${src}: 200"
 
 # An API response must never be touched. If the path filter is too broad, this is where it shows.
