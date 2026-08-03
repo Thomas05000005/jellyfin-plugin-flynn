@@ -27,10 +27,10 @@
   <ItemGroup>
     <!-- ExcludeAssets:runtime — the server provides these at runtime. Shipping them would put
          duplicate assemblies in the plugin folder. -->
-    <PackageReference Include="Jellyfin.Controller" Version="12.0.0-rc3">
+    <PackageReference Include="Jellyfin.Controller" Version="12.0.0-rc4">
       <ExcludeAssets>runtime</ExcludeAssets>
     </PackageReference>
-    <PackageReference Include="Jellyfin.Model" Version="12.0.0-rc3">
+    <PackageReference Include="Jellyfin.Model" Version="12.0.0-rc4">
       <ExcludeAssets>runtime</ExcludeAssets>
     </PackageReference>
   </ItemGroup>
