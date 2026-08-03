@@ -42,6 +42,15 @@ can bypass the constructor on nil-marked XML and hand you a null.
 failures, timeouts and cancellation. A failed module renders an error card and **never reports
 plausible-looking numbers** — wrong numbers feed deletion decisions, an error does not.
 
+### Nothing writes before `Core/Mutations` exists
+
+Every write goes through the mutation kernel: preview, apply, undo manifest. Modules default to
+read-only; writing is opt-in per operation.
+
+**Flynn never renames or moves a media file** — folders and sidecar files only. Beware the subtler
+case: rewriting ID3/Vorbis tags changes the audio file's bytes and silently kills torrent seeding
+even though nothing moved.
+
 ### Where data lives
 
 | Kind | Home |

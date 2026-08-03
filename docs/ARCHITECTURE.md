@@ -108,11 +108,59 @@ Rewritten, because the old shape does not scale to five pillars:
 
 ---
 
-## 6. Still open
+## 6. The companion is optional
 
-- **Sidecar: load-bearing or optional?** Roughly half the planned features need capabilities a
-  plugin does not have. If it is load-bearing, the socle must carry the shared contract and
-  `IsSidecarHostSafe` from the start.
-- **Write level.** Level 0 (read-only) / 1 (Jellyfin API) / 2 (files on disk). Level 2 is where
-  the value is and where the risk is; it is what makes `Core/Mutations` non-negotiable.
+The plugin runs *inside* the Jellyfin container, so it can read its own cgroup
+(`/sys/fs/cgroup/cpu.stat`, `memory.current`) — and ffmpeg children live in the **same** cgroup,
+which is exactly what `Process.GetCurrentProcess()` misses. Storage needs `DriveInfo` and
+`ILibraryManager`. Forecast is arithmetic over our own SQLite.
+
+**All of wave 1 therefore ships without a companion container.** That settles it: a plugin is
+installed from the catalogue, and requiring a `docker compose` edit to see a dashboard would cost
+more adoption than the extra panels are worth.
+
+Genuinely out of reach for a plugin, and therefore the companion's remit: other containers, the
+host, GPU metrics, the hardware-transcode self-test, the restore drill, audio fingerprinting.
+
+That last one is not a preference. **A single native DLL in the plugin folder marks the whole
+plugin `Malfunctioned`**, so anything native — Chromaprint first — *must* live outside. The
+companion is inevitable eventually; it is just never a prerequisite.
+
+### Capability model — build it into the socle now
+
+Each module declares the capabilities it needs. A missing capability produces a card that **names
+what is missing** ("GPU panel unavailable: `/dev/dri` is not mounted"), never an empty graph. An
+absent companion must be visible, because the alternative failure mode — stale numbers presented
+as current — is the one that gets libraries deleted.
+
+The companion's SSRF validator is **separate** from the webhook one. Webhooks must keep rejecting
+RFC1918; the companion lives on a Docker network and is reached by a config-pinned host, fixed
+scheme and port, no redirects, bearer required, never fed from a free-text field.
+
+## 7. Write level: level-2 architecture, level-0 default
+
+Picking a single level is a trap in both directions. Level 0 forever builds a dashboard that
+reports four hundred problems and fixes none — the tool people uninstall after a month. Level 2
+immediately means writing to files before the undo kernel is proven, which is how someone's
+library gets lost.
+
+- `Core/Mutations` is **designed for level 2 from the start**: preview, apply, undo manifest.
+- Every module **starts at level 0**. Writing is opt-in per operation.
+- **Nothing writes until `Core/Mutations` exists.**
+- **Hard invariant: Flynn never renames or moves a media file.** Folders and sidecar files only.
+
+### Known constraint: in-place tag writes break torrent seeding
+
+The invariant above is not enough for one case, and it is the flagship one. Artist identity merge
+has to write **tags** or the next scan re-fragments the artist. ID3 and Vorbis tags live *inside*
+the audio file, so rewriting them changes the file's bytes — the torrent piece hashes stop
+matching and the file silently stops seeding. The structure is untouched; only the seeding dies.
+
+Planned mitigation, to settle when `Core/Mutations` is designed: a per-library **"this library is
+seeded"** flag that downgrades those operations to read-only, plus an explicit warning before any
+tag write. Sidecar files are a poor third option — Jellyfin's NFO support is much weaker for music
+tracks than for movies.
+
+## 8. Still open
+
 - **Client runtime shape** — one bundle or per-module lazy loading.
