@@ -3,6 +3,8 @@ using Jellyfin.Plugin.Flynn.Core.Data;
 using Jellyfin.Plugin.Flynn.Core.Issues;
 using Jellyfin.Plugin.Flynn.Core.Modules;
 using Jellyfin.Plugin.Flynn.Core.Mutations;
+using Jellyfin.Plugin.Flynn.Core.Web;
+using Microsoft.AspNetCore.Hosting;
 using MediaBrowser.Common.Configuration;
 using MediaBrowser.Controller;
 using MediaBrowser.Controller.Plugins;
@@ -52,6 +54,10 @@ public sealed class PluginServiceRegistrator : IPluginServiceRegistrator
         serviceCollection.AddSingleton<IssueRegistry>();
         serviceCollection.AddSingleton<MutationKernel>();
         serviceCollection.AddSingleton<ModuleRegistry>();
+
+        // An IStartupFilter is all it takes for ASP.NET Core to wrap the pipeline; the
+        // server needs no knowledge of us.
+        serviceCollection.AddSingleton<IStartupFilter, InjectionStartupFilter>();
     }
 
     /// <summary>Builds the database path from the server's paths.</summary>

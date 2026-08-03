@@ -24,6 +24,7 @@
       the completeness tests compare the embedded set against AvailableLanguages.
     -->
     <EmbeddedResource Include="Strings\*.json" />
+    <EmbeddedResource Include="Client/runtime/*.js" />
   </ItemGroup>
 
   <ItemGroup>

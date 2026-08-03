@@ -28,6 +28,23 @@ jobs:
       - name: Test
         run: dotnet test -c Release --no-build --logger "console;verbosity=normal"
 
+      # A non-ASCII byte breaks the injected script silently on clients that decode it as latin1:
+      # no error, the feature simply never runs. The rule has to be a gate, not a comment.
+      - name: Client scripts must be pure ASCII
+        run: python3 build/check_client_ascii.py
+
+      # find, not a ** glob: bash only recurses with globstar enabled, so ** would quietly
+      # behave like * and skip anything nested deeper than one directory.
+      - name: Client scripts must parse
+        run: |
+          found=0
+          while IFS= read -r f; do
+            node --check "$f"
+            echo "  $f parses"
+            found=$((found + 1))
+          done < <(find src/Jellyfin.Plugin.Flynn/Client -name '*.js' -type f)
+          [ "$found" -gt 0 ] || { echo '::error::no client scripts found to check'; exit 1; }
+
   package:
     name: Package and check the assemblies whitelist
     runs-on: ubuntu-latest
@@ -123,6 +140,9 @@ jobs:
 
       - name: Assert the plugin loaded cleanly
         run: bash scripts/assert_plugin_loaded.sh jf
+
+      - name: Assert the client script is actually delivered
+        run: bash scripts/assert_injection.sh http://localhost:8096
 
       - name: Server log on failure
         if: failure()
