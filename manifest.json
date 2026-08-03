@@ -1,0 +1,21 @@
+[
+    {
+        "guid": "3c456481-2879-4378-82fd-96bc084d5668",
+        "name": "Flynn",
+        "description": "Administration suite for Jellyfin: maintenance, dashboards, capacity forecasting and library care.",
+        "overview": "One plugin, many modules you switch on individually. He fights for the Users.",
+        "owner": "Thomas05000005",
+        "category": "General",
+        "imageUrl": "",
+        "versions": [
+            {
+                "version": "0.1.0.0",
+                "changelog": "Skeleton: module contract and isolating registry.",
+                "targetAbi": "12.0.0.0",
+                "sourceUrl": "https://github.com/Thomas05000005/jellyfin-plugin-flynn/releases/download/v0.1.0/Flynn-v0.1.0.zip",
+                "checksum": "PLACEHOLDER_RECOMPUTE_AFTER_BUILD",
+                "timestamp": "2026-08-03T00:00:00.0000000Z"
+            }
+        ]
+    }
+]
