@@ -12,7 +12,7 @@ MARKER='id="flynn-client"'
 fail() { echo "::error::$1"; exit 1; }
 
 for path in "/web/index.html" "/"; do
-  body="$(curl -fsSL "${BASE}${path}")" || fail "GET ${path} failed"
+  body="$(curl -fsSL --max-time 30 "${BASE}${path}")" || fail "GET ${path} failed"
 
   count="$(grep -c "$MARKER" <<< "$body" || true)"
   if [ "$count" -eq 0 ]; then
@@ -32,16 +32,18 @@ for path in "/web/index.html" "/"; do
 done
 
 # The tag is worthless if what it points at is a 404.
-src="$(grep -o 'src="/Flynn/client\.js?v=[^"]*"' <<< "$(curl -fsSL "${BASE}/web/index.html")" | head -1 | sed 's/^src="//; s/"$//')"
+src="$(grep -o 'src="/Flynn/client\.js?v=[^"]*"' <<< "$(curl -fsSL --max-time 30 "${BASE}/web/index.html")" | head -1 | sed 's/^src="//; s/"$//')"
 [ -n "$src" ] || fail "Could not read the script src out of the rewritten document."
 
-status="$(curl -s -o /dev/null -w '%{http_code}' "${BASE}${src}")"
+status="$(curl -s -o /dev/null -w '%{http_code}' --max-time 30 "${BASE}${src}")"
 [ "$status" = "200" ] || fail "${src} answered ${status}; the injected tag points at nothing."
 echo "  ${src}: 200"
 
 # An API response must never be touched. If the path filter is too broad, this is where it shows.
-json="$(curl -fsSL "${BASE}/System/Info/Public")"
-grep -q "$MARKER" <<< "$json" && fail "A JSON API response was rewritten. The path filter is too broad."
+json="$(curl -fsSL --max-time 30 "${BASE}/System/Info/Public")"
+if grep -q "$MARKER" <<< "$json"; then
+  fail "A JSON API response was rewritten. The path filter is too broad."
+fi
 echo "  /System/Info/Public: untouched"
 
 echo "Flynn client delivery verified on ${BASE}."
