@@ -33,6 +33,55 @@
     <PackageReference Include="Jellyfin.Model" Version="12.0.0-rc4">
       <ExcludeAssets>runtime</ExcludeAssets>
     </PackageReference>
+
+    <!--
+      SQLite comes from the server, which already ships Microsoft.Data.Sqlite 10.0.10 and its
+      native e_sqlite3 next to jellyfin.dll. Pinned to the server's exact version so there is no
+      binding drift.
+
+      "runtime;native" is not belt-and-braces. ExcludeAssets="runtime" alone drops the managed
+      assemblies but keeps the `native` asset group, so runtimes/<rid>/native/e_sqlite3.dll still
+      lands in the plugin folder, and a native DLL there is what marks the whole plugin
+      Malfunctioned. Measured: plain reference publishes 23 dlls (4 native), "runtime" publishes 5
+      (still 4 native), "runtime;native" publishes none of them.
+
+      With no SQLite entry in our .deps.json, PluginLoadContext's resolver returns null and the
+      runtime falls back to the default load context, where the server's copy already lives. That
+      is the same path Jellyfin.Controller takes. Shipping our own would also make us the ones
+      carrying GHSA-2m69-gcr7-jv3q.
+    -->
+    <PackageReference Include="Microsoft.Data.Sqlite" Version="10.0.10">
+      <ExcludeAssets>runtime;native</ExcludeAssets>
+    </PackageReference>
   </ItemGroup>
+
+  <ItemGroup>
+    <!--
+      NU1903 fires on SQLitePCLRaw.lib.e_sqlite3 2.1.11, pulled in transitively by the reference
+      above. We never ship that binary: the ExcludeAssets setting keeps it out of our output, and
+      the "No SQLite or native binaries" target below fails the build if that ever stops being
+      true. The copy actually loaded at runtime is the server's own, which Jellyfin ships and
+      updates on its own schedule.
+
+      Suppressed by advisory URL rather than by disabling NU1903, so any OTHER vulnerability still
+      breaks the build. Delete this the day Jellyfin moves past 2.1.11.
+    -->
+    <NuGetAuditSuppress Include="https://github.com/advisories/GHSA-2m69-gcr7-jv3q" />
+  </ItemGroup>
+
+  <!--
+    The guarantee behind the suppression above. ExcludeAssets="runtime" alone would silently leave
+    runtimes/<rid>/native/e_sqlite3.dll in place, and one native DLL in a plugin folder marks the
+    whole plugin Malfunctioned, so this is checked rather than trusted.
+  -->
+  <Target Name="AssertNoNativeOrSqliteInOutput" AfterTargets="Build">
+    <ItemGroup>
+      <_ForbiddenOutput Include="$(OutputPath)**/*sqlite*" />
+      <_ForbiddenOutput Include="$(OutputPath)runtimes/**/*" />
+    </ItemGroup>
+    <Error
+      Condition="'@(_ForbiddenOutput)' != ''"
+      Text="The plugin output contains files that would mark it Malfunctioned on a real server: @(_ForbiddenOutput). Check ExcludeAssets on the package that brought them in (it needs native, not just runtime)." />
+  </Target>
 
 </Project>

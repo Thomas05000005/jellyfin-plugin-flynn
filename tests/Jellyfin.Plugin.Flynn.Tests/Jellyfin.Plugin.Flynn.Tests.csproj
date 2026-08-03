@@ -18,6 +18,16 @@
     -->
     <PackageReference Include="Jellyfin.Controller" Version="12.0.0-rc4" />
     <PackageReference Include="Jellyfin.Model" Version="12.0.0-rc4" />
+    <!--
+      Full assets here, unlike the plugin: the tests need a real SQLite engine in-process, which is
+      exactly the copy the server would provide at runtime.
+    -->
+    <PackageReference Include="Microsoft.Data.Sqlite" Version="10.0.10" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- Same advisory as the plugin project; see the note there. -->
+    <NuGetAuditSuppress Include="https://github.com/advisories/GHSA-2m69-gcr7-jv3q" />
   </ItemGroup>
 
   <ItemGroup>
