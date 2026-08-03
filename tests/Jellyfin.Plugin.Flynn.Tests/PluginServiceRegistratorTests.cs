@@ -5,6 +5,8 @@ using Jellyfin.Plugin.Flynn.Core.Issues;
 using Jellyfin.Plugin.Flynn.Core.Modules;
 using Jellyfin.Plugin.Flynn.Core.Mutations;
 using MediaBrowser.Common.Configuration;
+using MediaBrowser.Controller.Library;
+using NSubstitute;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
@@ -111,6 +113,12 @@ public class PluginServiceRegistratorTests
     {
         collection = new ServiceCollection();
         collection.AddSingleton<IApplicationPaths>(new FakePaths());
+
+        // Services the SERVER provides. They belong in the container because the point of this
+        // test is that OUR graph resolves inside the server's, and a plugin taking a new
+        // dependency on Jellyfin should show up here as a deliberate line rather than as a
+        // mysterious red.
+        collection.AddSingleton(Substitute.For<ILibraryManager>());
         collection.AddSingleton<ILoggerFactory>(NullLoggerFactory.Instance);
         collection.AddSingleton(typeof(ILogger<>), typeof(NullLogger<>));
 

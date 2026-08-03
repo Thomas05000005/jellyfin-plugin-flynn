@@ -9,6 +9,7 @@ using Microsoft.AspNetCore.Hosting;
 using MediaBrowser.Common.Configuration;
 using MediaBrowser.Controller;
 using MediaBrowser.Controller.Plugins;
+using MediaBrowser.Model.Tasks;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 
@@ -60,6 +61,9 @@ public sealed class PluginServiceRegistrator : IPluginServiceRegistrator
         // it up without either of them naming it.
         serviceCollection.AddSingleton<StorageRepository>();
         serviceCollection.AddSingleton<IFlynnModule, StorageModule>();
+        serviceCollection.AddSingleton<IDriveProbe, DriveProbe>();
+        serviceCollection.AddSingleton<StorageSweep>();
+        serviceCollection.AddSingleton<IScheduledTask, StorageSnapshotTask>();
 
         // An IStartupFilter is all it takes for ASP.NET Core to wrap the pipeline; the
         // server needs no knowledge of us.
