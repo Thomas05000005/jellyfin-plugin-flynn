@@ -3,5 +3,9 @@
   "module.unavailable.detail": "Ce module a signalé une erreur. Voir le journal du serveur.",
   "module.timed-out.detail": "Ce module a mis trop de temps à répondre et a été interrompu.",
   "module.disabled.headline": "Désactivé",
-  "config.rejected": "Ces réglages ne peuvent pas être enregistrés. Un champ texte contient probablement un caractère invalide en XML."
+  "config.rejected": "Ces réglages ne peuvent pas être enregistrés. Un champ texte contient probablement un caractère invalide en XML.",
+  "storage.headline": "{0} {1} dans vos bibliothèques",
+  "storage.tightest-device": "{0} % utilisés sur {1}",
+  "storage.no-snapshot-yet": "Aucun relevé pour l'instant. Le premier passage aura lieu cette nuit.",
+  "storage.unavailable": "Les relevés de stockage sont indisponibles."
 }

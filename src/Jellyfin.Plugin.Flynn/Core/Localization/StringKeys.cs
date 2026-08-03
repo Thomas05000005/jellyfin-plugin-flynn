@@ -31,6 +31,18 @@ public static class StringKeys
     /// <summary>Shown when a configuration change was refused as unpersistable.</summary>
     public const string ConfigRejected = "config.rejected";
 
+    /// <summary>Headline on the storage card: how much the libraries hold. {0} = formatted size.</summary>
+    public const string StorageHeadline = "storage.headline";
+
+    /// <summary>Detail on the storage card: the tightest device. {0} = percent used, {1} = mount path.</summary>
+    public const string StorageTightestDevice = "storage.tightest-device";
+
+    /// <summary>Shown before the first sweep has run.</summary>
+    public const string StorageNoSnapshotYet = "storage.no-snapshot-yet";
+
+    /// <summary>Shown when the module cannot reach its own storage.</summary>
+    public const string StorageUnavailable = "storage.unavailable";
+
     /// <summary>Gets every key defined above, for catalogue completeness checks.</summary>
     public static IReadOnlyList<string> All { get; } =
     [
@@ -39,5 +51,9 @@ public static class StringKeys
         ModuleTimedOutDetail,
         ModuleDisabledHeadline,
         ConfigRejected,
+        StorageHeadline,
+        StorageTightestDevice,
+        StorageNoSnapshotYet,
+        StorageUnavailable,
     ];
 }

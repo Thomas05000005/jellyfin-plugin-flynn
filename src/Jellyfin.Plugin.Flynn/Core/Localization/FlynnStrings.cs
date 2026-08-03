@@ -22,13 +22,16 @@ public sealed class FlynnStrings
 
     private readonly IReadOnlyDictionary<string, string> _preferred;
     private readonly IReadOnlyDictionary<string, string> _fallback;
+    private readonly CultureInfo _culture;
 
     private FlynnStrings(
         IReadOnlyDictionary<string, string> preferred,
-        IReadOnlyDictionary<string, string> fallback)
+        IReadOnlyDictionary<string, string> fallback,
+        CultureInfo culture)
     {
         _preferred = preferred;
         _fallback = fallback;
+        _culture = culture;
     }
 
     /// <summary>Gets the language codes that ship with the plugin.</summary>
@@ -50,7 +53,8 @@ public sealed class FlynnStrings
         var english = Load(SourceLanguage);
         return new FlynnStrings(
             AvailableLanguages.Contains(language) ? Load(language) : english,
-            english);
+            english,
+            culture);
     }
 
     /// <summary>Resolves a key, substituting positional arguments.</summary>
@@ -78,7 +82,9 @@ public sealed class FlynnStrings
 
         try
         {
-            return string.Format(CultureInfo.CurrentCulture, template, args);
+            // The reader's culture, not the process's. A background task started under a French
+            // locale must not decide that an English admin sees "4,2 TB".
+            return string.Format(_culture, template, args);
         }
         catch (FormatException)
         {

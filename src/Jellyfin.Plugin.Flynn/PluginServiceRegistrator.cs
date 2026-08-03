@@ -4,6 +4,7 @@ using Jellyfin.Plugin.Flynn.Core.Issues;
 using Jellyfin.Plugin.Flynn.Core.Modules;
 using Jellyfin.Plugin.Flynn.Core.Mutations;
 using Jellyfin.Plugin.Flynn.Core.Web;
+using Jellyfin.Plugin.Flynn.Modules.Storage;
 using Microsoft.AspNetCore.Hosting;
 using MediaBrowser.Common.Configuration;
 using MediaBrowser.Controller;
@@ -54,6 +55,11 @@ public sealed class PluginServiceRegistrator : IPluginServiceRegistrator
         serviceCollection.AddSingleton<IssueRegistry>();
         serviceCollection.AddSingleton<MutationKernel>();
         serviceCollection.AddSingleton<ModuleRegistry>();
+
+        // Modules. Each registers itself as IFlynnModule so the registry and the admin page pick
+        // it up without either of them naming it.
+        serviceCollection.AddSingleton<StorageRepository>();
+        serviceCollection.AddSingleton<IFlynnModule, StorageModule>();
 
         // An IStartupFilter is all it takes for ASP.NET Core to wrap the pipeline; the
         // server needs no knowledge of us.
