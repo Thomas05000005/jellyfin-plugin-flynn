@@ -1,0 +1,13 @@
+bin/
+obj/
+*.user
+.vs/
+.config/
+deploy/
+StrykerOutput/
+.stryker-tmp/
+.DS_Store
+__pycache__/
+
+# Claude local-only
+CLAUDE.local.md
