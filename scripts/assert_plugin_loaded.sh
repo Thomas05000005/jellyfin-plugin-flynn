@@ -29,3 +29,15 @@ if echo "$LOG" | grep -iE "$FAILURES"; then
 fi
 
 echo "Flynn loaded cleanly on $CONTAINER, with no load or resolution errors."
+
+# Loading is not the same as working. This is the end-to-end proof that the socle came up on a
+# real server: DI resolved, the startup service ran, and -- the assumption most worth checking --
+# SQLite resolved to the SERVER's Microsoft.Data.Sqlite and its native e_sqlite3, since the plugin
+# deliberately ships neither. If that fallback did not work, the message below is what is missing.
+if ! echo "$LOG" | grep -qE "Flynn database ready at schema version [0-9]+"; then
+  echo "::error::Flynn loaded but its database never came up. If the plugin ships no SQLite binary,"
+  echo "::error::this is the load-context fallback to the server's copy failing."
+  exit 1
+fi
+
+echo "$LOG" | grep -E "Flynn database ready at schema version [0-9]+"
