@@ -77,5 +77,11 @@ must always hold needs a CI check or a `.claude/hooks/` entry, not a sentence he
 
 ## Status
 
-Skeleton. Only `Core/Modules` (the module contract and its registry) exists.
+The socle is complete and wired into the server's container: `Core/Modules`, `Core/Config`,
+`Core/Data`, `Core/Localization`, `Core/Issues`, `Core/Mutations`. No module exists yet, so the
+plugin loads and does nothing visible.
+
+Next: script injection, the admin page rendered from the module registry, then Storage as the
+first real module.
+
 Design, decisions and the porting plan: `docs/ARCHITECTURE.md`.
