@@ -1,0 +1,138 @@
+name: Release
+
+on:
+  push:
+    tags: ['v*']
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Tag to release, e.g. v0.1.0'
+        required: true
+
+permissions:
+  contents: write
+
+env:
+  DOTNET_NOLOGO: 1
+  REPO_OWNER: Thomas05000005
+  REPO_NAME: jellyfin-plugin-flynn
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+          fetch-depth: 0
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+
+      - name: Work out the version
+        id: version
+        run: |
+          TAG="${{ github.event.inputs.tag || github.ref_name }}"
+          echo "tag=$TAG" >> "$GITHUB_OUTPUT"
+          # Jellyfin wants four parts everywhere: v0.1.0 becomes 0.1.0.0.
+          echo "four=${TAG#v}.0" >> "$GITHUB_OUTPUT"
+
+      # A release whose assembly version disagrees with its manifest entry installs and then
+      # reports the wrong version forever, and the ETag that busts the browser cache is built from
+      # it. Cheaper to refuse here.
+      - name: The tag, the assembly and the manifest must agree
+        run: |
+          python3 - <<'PY'
+          import json, os, re, sys
+          from pathlib import Path
+
+          four = os.environ["FOUR"]
+          csproj = Path("src/Jellyfin.Plugin.Flynn/Jellyfin.Plugin.Flynn.csproj").read_text()
+
+          for field in ("AssemblyVersion", "FileVersion"):
+              found = re.search(rf"<{field}>([^<]+)</{field}>", csproj).group(1)
+              if found != four:
+                  raise SystemExit(f"{field} is {found}, tag says {four}")
+
+          top = json.loads(Path("manifest.json").read_text())[0]["versions"][0]
+          if top["version"] != four:
+              raise SystemExit(f"manifest top version is {top['version']}, tag says {four}")
+
+          expected = (
+              f"https://github.com/{os.environ['REPO_OWNER']}/{os.environ['REPO_NAME']}"
+              f"/releases/download/{os.environ['TAG']}/Flynn-{os.environ['TAG']}.zip"
+          )
+          # Case sensitive on GitHub. A typo here publishes a release that installs as a 404 while
+          # every other check stays green, which has happened before on the predecessor plugin.
+          if top["sourceUrl"] != expected:
+              raise SystemExit(f"manifest sourceUrl is\n  {top['sourceUrl']}\nexpected\n  {expected}")
+
+          print(f"tag, assembly and manifest all agree on {four}")
+          PY
+        env:
+          FOUR: ${{ steps.version.outputs.four }}
+          TAG: ${{ steps.version.outputs.tag }}
+
+      - name: Build
+        run: dotnet build -c Release
+
+      - name: Test
+        run: dotnet test -c Release --no-build
+
+      - name: Client scripts must be pure ASCII
+        run: python3 build/check_client_ascii.py
+
+      - name: Stage exactly what ships
+        run: |
+          mkdir -p staging
+          cp src/Jellyfin.Plugin.Flynn/bin/Release/net10.0/Jellyfin.Plugin.Flynn.dll staging/
+          python3 build/make_meta.py --staging staging
+
+      - name: Zip and checksum
+        id: package
+        run: |
+          ZIP="Flynn-${{ steps.version.outputs.tag }}.zip"
+          (cd staging && zip -j "../$ZIP" ./*)
+          echo "zip=$ZIP" >> "$GITHUB_OUTPUT"
+          # MD5 is what Jellyfin's installer verifies. Not a security property, a transfer check.
+          echo "md5=$(md5sum "$ZIP" | cut -d' ' -f1)" >> "$GITHUB_OUTPUT"
+
+      - name: Publish the release
+        run: |
+          gh release create "${{ steps.version.outputs.tag }}" "${{ steps.package.outputs.zip }}" \
+            --title "Flynn ${{ steps.version.outputs.tag }}" \
+            --notes-file "docs/release-notes/${{ steps.version.outputs.tag }}.md" \
+            --verify-tag
+        env:
+          GH_TOKEN: ${{ github.token }}
+
+      # Done last and committed back, because the checksum cannot be known until the artefact
+      # exists. Until this lands, the manifest advertises a placeholder and Jellyfin refuses the
+      # download rather than installing something unverified.
+      - name: Write the real checksum into the manifest
+        run: |
+          python3 - <<'PY'
+          import json, os
+          from datetime import datetime, timezone
+          from pathlib import Path
+
+          path = Path("manifest.json")
+          data = json.loads(path.read_text())
+          top = data[0]["versions"][0]
+          top["checksum"] = os.environ["MD5"]
+          top["timestamp"] = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%S.0000000Z")
+          path.write_text(json.dumps(data, indent=4) + "\n")
+          print(f"checksum {os.environ['MD5']}")
+          PY
+        env:
+          MD5: ${{ steps.package.outputs.md5 }}
+
+      - name: Commit the manifest
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add manifest.json
+          git commit -m "chore: checksum and timestamp for ${{ steps.version.outputs.tag }}"
+          git push origin HEAD:main
