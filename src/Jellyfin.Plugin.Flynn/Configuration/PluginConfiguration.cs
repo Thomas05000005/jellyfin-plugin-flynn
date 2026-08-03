@@ -1,3 +1,4 @@
+using Jellyfin.Plugin.Flynn.Core.Mutations;
 using MediaBrowser.Model.Plugins;
 
 namespace Jellyfin.Plugin.Flynn.Configuration;
@@ -25,6 +26,16 @@ public class PluginConfiguration : BasePluginConfiguration
     /// </para>
     /// </summary>
     public List<ModuleToggle> Modules { get; set; } = new();
+
+    /// <summary>
+    /// Gets or sets the furthest any module is allowed to reach when changing something.
+    /// <para>
+    /// Defaults to <see cref="WriteLevel.None"/>: a fresh install reports and changes nothing until
+    /// the admin says otherwise. The kernel refuses anything above this before it runs, which is
+    /// what makes report-only a mode rather than a promise.
+    /// </para>
+    /// </summary>
+    public WriteLevel MaxWriteLevel { get; set; } = WriteLevel.None;
 }
 
 /// <summary>One module's on/off state, as persisted.</summary>

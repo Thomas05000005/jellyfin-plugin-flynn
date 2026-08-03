@@ -66,5 +66,24 @@ public static class Migrations
 
             CREATE INDEX ix_issue_state ON issue (state, severity);
             """),
+
+        new Migration(
+            3,
+            "mutation log",
+            """
+            CREATE TABLE mutation_log (
+                id          INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT,
+                module_id   TEXT    NOT NULL,
+                kind        TEXT    NOT NULL,
+                write_level INTEGER NOT NULL,
+                step_count  INTEGER NOT NULL,
+                undo_manifest TEXT  NOT NULL,
+                applied_at  TEXT        NULL,
+                undone_at   TEXT        NULL,
+                prepared_at TEXT    NOT NULL
+            );
+
+            CREATE INDEX ix_mutation_log_recent ON mutation_log (prepared_at DESC);
+            """),
     ];
 }
