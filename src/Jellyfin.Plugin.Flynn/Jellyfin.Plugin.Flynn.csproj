@@ -18,6 +18,12 @@
   <ItemGroup>
     <None Remove="Configuration\configPage.html" />
     <EmbeddedResource Include="Configuration\configPage.html" />
+    <!--
+      Wildcarded on purpose: adding Strings\de.json must not also require remembering to register
+      it here. A catalogue that exists on disk but is not embedded fails silently at runtime, so
+      the completeness tests compare the embedded set against AvailableLanguages.
+    -->
+    <EmbeddedResource Include="Strings\*.json" />
   </ItemGroup>
 
   <ItemGroup>

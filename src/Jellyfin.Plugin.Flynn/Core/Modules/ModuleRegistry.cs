@@ -73,7 +73,7 @@ public sealed class ModuleRegistry
     {
         if (!isEnabled(module.Id))
         {
-            return new ModuleCard(module.Id, ModuleState.Disabled, "Off", null, DateTimeOffset.UtcNow);
+            return ModuleCard.Disabled(module.Id, DateTimeOffset.UtcNow);
         }
 
         using var timeout = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
@@ -96,13 +96,13 @@ public sealed class ModuleRegistry
                 "Module {ModuleId} took longer than {Seconds}s to build its card and was cut off.",
                 module.Id,
                 _cardTimeout.TotalSeconds);
-            return ModuleCard.Failed(module.Id, "Timed out while reporting.");
+            return ModuleCard.TimedOut(module.Id, DateTimeOffset.UtcNow);
         }
 #pragma warning disable CA1031 // Isolation is the entire point of this class.
         catch (Exception ex)
         {
             _logger.LogError(ex, "Module {ModuleId} threw while building its card.", module.Id);
-            return ModuleCard.Failed(module.Id, "The module reported an error. See the server log.");
+            return ModuleCard.Failed(module.Id, DateTimeOffset.UtcNow);
         }
 #pragma warning restore CA1031
     }

@@ -1,0 +1,7 @@
+{
+  "module.unavailable.headline": "Unavailable",
+  "module.unavailable.detail": "This module reported an error. See the server log.",
+  "module.timed-out.detail": "This module took too long to report and was cut off.",
+  "module.disabled.headline": "Off",
+  "config.rejected": "These settings cannot be stored. A text field most likely contains a character that is not valid in XML."
+}

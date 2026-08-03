@@ -1,3 +1,5 @@
+using Jellyfin.Plugin.Flynn.Core.Localization;
+
 namespace Jellyfin.Plugin.Flynn.Core.Modules;
 
 /// <summary>Health of a module, as rendered on its dashboard card.</summary>
@@ -34,14 +36,38 @@ public enum ModuleState
 public sealed record ModuleCard(
     string ModuleId,
     ModuleState State,
-    string Headline,
-    string? Detail,
+    LocalizedText Headline,
+    LocalizedText? Detail,
     DateTimeOffset GeneratedAt)
 {
     /// <summary>Builds the card shown when a module threw while reporting.</summary>
     /// <param name="moduleId">The module that failed.</param>
-    /// <param name="reason">Short, already-sanitised reason. Never include raw exception text.</param>
+    /// <param name="now">The moment of failure.</param>
     /// <returns>A card in the <see cref="ModuleState.Failed"/> state.</returns>
-    public static ModuleCard Failed(string moduleId, string reason) =>
-        new(moduleId, ModuleState.Failed, "Unavailable", reason, DateTimeOffset.UtcNow);
+    public static ModuleCard Failed(string moduleId, DateTimeOffset now) =>
+        new(
+            moduleId,
+            ModuleState.Failed,
+            LocalizedText.Of(StringKeys.ModuleUnavailableHeadline),
+            LocalizedText.Of(StringKeys.ModuleUnavailableDetail),
+            now);
+
+    /// <summary>Builds the card shown when a module missed its reporting deadline.</summary>
+    /// <param name="moduleId">The module that timed out.</param>
+    /// <param name="now">The moment it was cut off.</param>
+    /// <returns>A card in the <see cref="ModuleState.Failed"/> state.</returns>
+    public static ModuleCard TimedOut(string moduleId, DateTimeOffset now) =>
+        new(
+            moduleId,
+            ModuleState.Failed,
+            LocalizedText.Of(StringKeys.ModuleUnavailableHeadline),
+            LocalizedText.Of(StringKeys.ModuleTimedOutDetail),
+            now);
+
+    /// <summary>Builds the card shown for a module the admin switched off.</summary>
+    /// <param name="moduleId">The module that is off.</param>
+    /// <param name="now">Now.</param>
+    /// <returns>A card in the <see cref="ModuleState.Disabled"/> state.</returns>
+    public static ModuleCard Disabled(string moduleId, DateTimeOffset now) =>
+        new(moduleId, ModuleState.Disabled, LocalizedText.Of(StringKeys.ModuleDisabledHeadline), null, now);
 }

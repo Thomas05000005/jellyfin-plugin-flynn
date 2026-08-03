@@ -1,4 +1,5 @@
 using System.Diagnostics;
+using Jellyfin.Plugin.Flynn.Core.Localization;
 using Jellyfin.Plugin.Flynn.Core.Modules;
 using Microsoft.Extensions.Logging.Abstractions;
 using Xunit;
@@ -11,6 +12,8 @@ namespace Jellyfin.Plugin.Flynn.Tests;
 /// </summary>
 public class ModuleRegistryTests
 {
+    private const string HealthyHeadlineKey = "test.healthy.headline";
+
     private static readonly TimeSpan ShortTimeout = TimeSpan.FromMilliseconds(150);
 
     private static ModuleRegistry Build(params IFlynnModule[] modules) =>
@@ -28,19 +31,24 @@ public class ModuleRegistryTests
 
         var healthy = Assert.Single(cards, c => c.ModuleId == "healthy");
         Assert.Equal(ModuleState.Healthy, healthy.State);
-        Assert.Equal("all good", healthy.Headline);
+        Assert.Equal(HealthyHeadlineKey, healthy.Headline.Key);
     }
 
+    /// <summary>
+    /// A failure card is built from keys alone, so there is no channel through which an exception
+    /// message could reach the admin's screen. This asserts that the channel stays closed.
+    /// </summary>
     [Fact]
-    public async Task AFailedCard_NeverLeaksTheExceptionMessage()
+    public async Task AFailedCard_CarriesOnlyKeys_SoNothingFromTheExceptionCanLeak()
     {
         var registry = Build(new ThrowingModule());
 
         var card = Assert.Single(await registry.BuildCardsAsync(_ => true, CancellationToken.None));
 
-        Assert.Equal(ModuleState.Failed, card.State);
-        Assert.DoesNotContain(ThrowingModule.SecretInMessage, card.Detail ?? string.Empty, StringComparison.Ordinal);
-        Assert.DoesNotContain(ThrowingModule.SecretInMessage, card.Headline, StringComparison.Ordinal);
+        Assert.Equal(StringKeys.ModuleUnavailableHeadline, card.Headline.Key);
+        Assert.Equal(StringKeys.ModuleUnavailableDetail, card.Detail?.Key);
+        Assert.Empty(card.Headline.Args);
+        Assert.Empty(card.Detail!.Args);
     }
 
     [Fact]
@@ -52,6 +60,7 @@ public class ModuleRegistryTests
         var card = Assert.Single(await registry.BuildCardsAsync(_ => false, CancellationToken.None));
 
         Assert.Equal(ModuleState.Disabled, card.State);
+        Assert.Equal(StringKeys.ModuleDisabledHeadline, card.Headline.Key);
         Assert.False(spy.WasCalled);
     }
 
@@ -62,7 +71,10 @@ public class ModuleRegistryTests
 
         var cards = await registry.BuildCardsAsync(_ => true, CancellationToken.None);
 
-        Assert.Equal(ModuleState.Failed, Assert.Single(cards, c => c.ModuleId == "hanging").State);
+        var cut = Assert.Single(cards, c => c.ModuleId == "hanging");
+        Assert.Equal(ModuleState.Failed, cut.State);
+        Assert.Equal(StringKeys.ModuleTimedOutDetail, cut.Detail?.Key);
+
         Assert.Equal(ModuleState.Healthy, Assert.Single(cards, c => c.ModuleId == "healthy").State);
     }
 
@@ -90,8 +102,12 @@ public class ModuleRegistryTests
         public Task<ModuleCard> BuildCardAsync(CancellationToken cancellationToken)
         {
             WasCalled = true;
-            return Task.FromResult(
-                new ModuleCard(Id, ModuleState.Healthy, "all good", null, DateTimeOffset.UtcNow));
+            return Task.FromResult(new ModuleCard(
+                Id,
+                ModuleState.Healthy,
+                LocalizedText.Of(HealthyHeadlineKey),
+                null,
+                DateTimeOffset.UtcNow));
         }
     }
 
