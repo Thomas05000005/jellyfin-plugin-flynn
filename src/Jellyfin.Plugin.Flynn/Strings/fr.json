@@ -26,5 +26,10 @@
   "ui.withheld.dismissed": "{0} ecartee(s)",
   "ui.withheld.snoozed": "{0} en sommeil",
   "ui.withheld.resolved": "{0} resolue(s)",
-  "ui.toggle-failed": "Impossible d'enregistrer ce changement."
+  "ui.toggle-failed": "Impossible d'enregistrer ce changement.",
+  "ui.cat.operations": "Exploitation",
+  "ui.cat.system": "Systeme",
+  "ui.cat.library": "Bibliotheque",
+  "ui.cat.music": "Musique",
+  "ui.cat.people": "Utilisateurs"
 }

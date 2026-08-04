@@ -99,6 +99,8 @@ public class ModuleRegistryTests
 
         public string Summary => "Reports fine.";
 
+        public ModuleCategory Category => ModuleCategory.System;
+
         public bool EnabledByDefault => true;
 
         public Task<ModuleCard> BuildCardAsync(CancellationToken cancellationToken)
@@ -123,6 +125,8 @@ public class ModuleRegistryTests
 
         public string Summary => "Always blows up.";
 
+        public ModuleCategory Category => ModuleCategory.System;
+
         public bool EnabledByDefault => true;
 
         public Task<ModuleCard> BuildCardAsync(CancellationToken cancellationToken) =>
@@ -136,6 +140,8 @@ public class ModuleRegistryTests
         public string DisplayName => "Hanging";
 
         public string Summary => "Never returns on its own.";
+
+        public ModuleCategory Category => ModuleCategory.System;
 
         public bool EnabledByDefault => true;
 

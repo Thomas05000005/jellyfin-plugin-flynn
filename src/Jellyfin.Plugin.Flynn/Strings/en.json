@@ -26,5 +26,10 @@
   "ui.withheld.dismissed": "{0} dismissed",
   "ui.withheld.snoozed": "{0} snoozed",
   "ui.withheld.resolved": "{0} resolved",
-  "ui.toggle-failed": "Could not save that change."
+  "ui.toggle-failed": "Could not save that change.",
+  "ui.cat.operations": "Operations",
+  "ui.cat.system": "System",
+  "ui.cat.library": "Library",
+  "ui.cat.music": "Music",
+  "ui.cat.people": "People"
 }

@@ -1,62 +1,151 @@
 /*
  * Flynn admin page styles.
  *
- * Colours come from Jellyfin's own theme variables wherever one exists, with a fallback. Hard
- * coding white text was a real bug class in the previous plugin: it looked right in the default
- * dark theme and was unreadable in every light one.
+ * The palette is Tron's, which is not decoration: cyan for normal and amber for danger is already
+ * how a control panel reads, and it gives the plugin a face of its own next to every other blue
+ * Jellyfin page.
+ *
+ * Everything structural comes from Jellyfin's own theme variables with a fallback. Hard-coding
+ * white text was a real bug class in the previous plugin: it looked right in the default dark
+ * theme and was unreadable in every light one. Our colours are only ever accents -- edges, dots,
+ * the switch -- never the surface text sits on.
  */
+
+#FlynnConfigPage {
+    --flynn-cyan: #29c5d6;
+    --flynn-cyan-dim: rgba(41, 197, 214, 0.14);
+    --flynn-amber: #d68a1f;
+    --flynn-red: #c9524a;
+    --flynn-blue: #4b7bd4;
+    --flynn-line: var(--divider-color, rgba(127, 127, 127, 0.28));
+}
+
+/* ---- header ---- */
 
 .flynn-header {
     display: flex;
     align-items: baseline;
-    gap: 0.75rem;
+    gap: 0.8rem;
     flex-wrap: wrap;
-    margin-bottom: 0.25rem;
+    padding-bottom: 0.9rem;
+    border-bottom: 1px solid var(--flynn-line);
 }
 
 .flynn-title {
-    font-size: 1.6rem;
+    font-size: 1.7rem;
     font-weight: 600;
+    letter-spacing: 0.02em;
     margin: 0;
+    /* A gradient on the wordmark only. Enough to be ours, not enough to fight the theme. */
+    background: linear-gradient(100deg, var(--flynn-cyan), var(--flynn-blue));
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
 }
 
 .flynn-tagline {
-    font-size: 0.9rem;
-    opacity: 0.6;
+    font-size: 0.85rem;
+    opacity: 0.55;
     font-style: italic;
 }
 
+/* ---- categories ---- */
+
+.flynn-cat {
+    margin-top: 1.9rem;
+}
+
+.flynn-cat-title {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    font-size: 0.72rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.12em;
+    opacity: 0.6;
+    margin: 0 0 0.7rem;
+}
+
+.flynn-cat-count {
+    font-size: 0.68rem;
+    font-weight: 600;
+    letter-spacing: 0;
+    padding: 0.05rem 0.4rem;
+    border-radius: 0.6rem;
+    background: var(--flynn-cyan-dim);
+    color: var(--flynn-cyan);
+}
+
 .flynn-section {
-    margin-top: 1.75rem;
+    margin-top: 1.9rem;
 }
 
 .flynn-section-title {
-    font-size: 0.78rem;
-    font-weight: 600;
+    font-size: 0.72rem;
+    font-weight: 700;
     text-transform: uppercase;
-    letter-spacing: 0.08em;
-    opacity: 0.65;
-    margin: 0 0 0.6rem;
+    letter-spacing: 0.12em;
+    opacity: 0.6;
+    margin: 0 0 0.7rem;
 }
 
 .flynn-grid {
     display: grid;
     grid-template-columns: repeat(auto-fill, minmax(19rem, 1fr));
-    gap: 0.75rem;
+    gap: 0.8rem;
 }
+
+/* ---- cards ---- */
 
 .flynn-card,
 .flynn-issue {
-    border: 1px solid var(--divider-color, rgba(127, 127, 127, 0.3));
-    border-radius: 0.5rem;
-    padding: 0.9rem 1rem;
+    position: relative;
+    overflow: hidden;
+    border: 1px solid var(--flynn-line);
+    border-radius: 0.55rem;
+    padding: 0.95rem 1.05rem;
     color: inherit;
-    background: rgba(127, 127, 127, 0.06);
-    transition: border-color 0.15s ease;
+    /* A barely-there gradient rather than a flat fill: it lifts the card off the page without
+       committing to a background colour that would fight a light theme. */
+    background:
+        linear-gradient(160deg, rgba(127, 127, 127, 0.10), rgba(127, 127, 127, 0.03));
+    transition: border-color 0.18s ease, transform 0.18s ease;
 }
 
 .flynn-card:hover {
-    border-color: rgba(127, 127, 127, 0.55);
+    border-color: rgba(127, 127, 127, 0.5);
+    transform: translateY(-1px);
+}
+
+/* The state edge is a gradient too, brightest at the top, so a wall of cards has a direction. */
+.flynn-card::before,
+.flynn-issue::before {
+    content: "";
+    position: absolute;
+    left: 0;
+    top: 0;
+    bottom: 0;
+    width: 3px;
+    background: transparent;
+}
+
+.flynn-healthy::before {
+    background: linear-gradient(180deg, var(--flynn-cyan), rgba(41, 197, 214, 0.25));
+}
+
+.flynn-degraded::before,
+.flynn-warning::before {
+    background: linear-gradient(180deg, var(--flynn-amber), rgba(214, 138, 31, 0.25));
+}
+
+.flynn-failed::before,
+.flynn-critical::before {
+    background: linear-gradient(180deg, var(--flynn-red), rgba(201, 82, 74, 0.25));
+}
+
+.flynn-info::before {
+    background: linear-gradient(180deg, var(--flynn-blue), rgba(75, 123, 212, 0.25));
 }
 
 .flynn-card-top {
@@ -68,20 +157,21 @@
 
 .flynn-card-name {
     font-weight: 600;
-    font-size: 1.02rem;
+    font-size: 1rem;
 }
 
 .flynn-card-summary {
-    font-size: 0.8rem;
-    opacity: 0.65;
-    margin-top: 0.1rem;
-    max-width: 22rem;
+    font-size: 0.78rem;
+    opacity: 0.6;
+    margin-top: 0.12rem;
+    max-width: 21rem;
 }
 
 .flynn-card-headline {
-    font-size: 1.7rem;
+    font-size: 1.75rem;
+    font-weight: 300;
     line-height: 1.15;
-    margin: 0.7rem 0 0.15rem;
+    margin: 0.75rem 0 0.15rem;
 }
 
 .flynn-card-detail,
@@ -96,75 +186,61 @@
 .flynn-issue-foot {
     display: flex;
     align-items: center;
-    margin-top: 0.75rem;
-    font-size: 0.75rem;
-    opacity: 0.65;
+    margin-top: 0.8rem;
+    font-size: 0.73rem;
+    opacity: 0.6;
 }
 
 .flynn-sep::before {
     content: "\00B7";
-    margin: 0 0.4rem;
+    margin: 0 0.45rem;
     opacity: 0.6;
 }
 
-/* State reads as a dot and a left edge rather than a filled background, so the text keeps the
-   theme's own contrast instead of sitting on a colour we picked. */
 .flynn-dot {
-    width: 0.5rem;
-    height: 0.5rem;
+    width: 0.45rem;
+    height: 0.45rem;
     border-radius: 50%;
-    margin-right: 0.4rem;
+    margin-right: 0.45rem;
     background: currentColor;
-    opacity: 0.8;
-}
-
-.flynn-healthy {
-    border-left: 3px solid var(--flynn-ok, #2aa198);
 }
 
 .flynn-healthy .flynn-dot {
-    background: var(--flynn-ok, #2aa198);
-}
-
-.flynn-degraded,
-.flynn-warning {
-    border-left: 3px solid var(--flynn-warn, #d38c00);
+    background: var(--flynn-cyan);
+    box-shadow: 0 0 6px var(--flynn-cyan);
 }
 
 .flynn-degraded .flynn-dot {
-    background: var(--flynn-warn, #d38c00);
-}
-
-.flynn-failed,
-.flynn-critical {
-    border-left: 3px solid var(--flynn-bad, #c1443c);
+    background: var(--flynn-amber);
+    box-shadow: 0 0 6px rgba(214, 138, 31, 0.7);
 }
 
 .flynn-failed .flynn-dot {
-    background: var(--flynn-bad, #c1443c);
-}
-
-.flynn-info {
-    border-left: 3px solid var(--flynn-info, #4b7bd4);
-}
-
-.flynn-disabled {
-    border-left: 3px solid transparent;
+    background: var(--flynn-red);
+    box-shadow: 0 0 6px rgba(201, 82, 74, 0.7);
 }
 
 .flynn-disabled .flynn-card-headline,
-.flynn-disabled .flynn-card-summary {
-    opacity: 0.45;
+.flynn-disabled .flynn-card-summary,
+.flynn-disabled .flynn-card-detail {
+    opacity: 0.35;
 }
 
-/* Switch. Built from a checkbox so it stays keyboard reachable and announces itself; a div with
-   a click handler would look identical and be unusable without a mouse. */
+.flynn-disabled .flynn-dot {
+    background: currentColor;
+    opacity: 0.4;
+}
+
+/* ---- switch ---- */
+
+/* Built from a checkbox so it stays keyboard reachable and announces itself. A div with a click
+   handler would look identical and be unusable without a mouse. */
 .flynn-switch {
     position: relative;
     display: inline-block;
-    width: 2.6rem;
-    min-width: 2.6rem;
-    height: 1.45rem;
+    width: 2.55rem;
+    min-width: 2.55rem;
+    height: 1.4rem;
     flex: none;
 }
 
@@ -180,25 +256,26 @@
     position: absolute;
     inset: 0;
     border-radius: 1rem;
-    background: rgba(127, 127, 127, 0.4);
-    transition: background 0.15s ease;
+    background: rgba(127, 127, 127, 0.35);
+    transition: background 0.18s ease, box-shadow 0.18s ease;
     pointer-events: none;
 }
 
 .flynn-slider::before {
     content: "";
     position: absolute;
-    height: 1.05rem;
-    width: 1.05rem;
+    height: 1rem;
+    width: 1rem;
     left: 0.2rem;
     bottom: 0.2rem;
     border-radius: 50%;
     background: #fff;
-    transition: transform 0.15s ease;
+    transition: transform 0.18s ease;
 }
 
 .flynn-switch input:checked + .flynn-slider {
-    background: var(--flynn-ok, #2aa198);
+    background: linear-gradient(120deg, var(--flynn-cyan), var(--flynn-blue));
+    box-shadow: 0 0 8px rgba(41, 197, 214, 0.45);
 }
 
 .flynn-switch input:checked + .flynn-slider::before {
@@ -206,7 +283,7 @@
 }
 
 .flynn-switch input:focus-visible + .flynn-slider {
-    outline: 2px solid var(--focus-color, #00a4dc);
+    outline: 2px solid var(--flynn-cyan);
     outline-offset: 2px;
 }
 
@@ -214,8 +291,10 @@
     opacity: 0.5;
 }
 
+/* ---- issues ---- */
+
 .flynn-issue {
-    margin-bottom: 0.5rem;
+    margin-bottom: 0.55rem;
 }
 
 .flynn-issue-title {
@@ -223,11 +302,24 @@
 }
 
 .flynn-clear {
-    opacity: 0.7;
+    opacity: 0.65;
 }
 
 .flynn-withheld {
-    margin-top: 0.75rem;
-    font-size: 0.8rem;
-    opacity: 0.6;
+    margin-top: 0.8rem;
+    font-size: 0.78rem;
+    opacity: 0.55;
+}
+
+/* Respect a system preference for less motion; the lift on hover is decoration, not information. */
+@media (prefers-reduced-motion: reduce) {
+    .flynn-card,
+    .flynn-slider,
+    .flynn-slider::before {
+        transition: none;
+    }
+
+    .flynn-card:hover {
+        transform: none;
+    }
 }

@@ -69,6 +69,7 @@ public sealed class DashboardController : ControllerBase
                 module.DisplayName,
                 module.Summary,
                 card.State.ToString(),
+                module.Category.ToString(),
                 card.State != ModuleState.Disabled,
                 card.Headline.Resolve(strings),
                 card.Detail?.Resolve(strings),
@@ -232,6 +233,7 @@ public sealed record DashboardDto(
 /// <param name="Name">Display name.</param>
 /// <param name="Summary">One line about what the module does.</param>
 /// <param name="State">Disabled, Healthy, Degraded or Failed.</param>
+/// <param name="Category">Which shelf the dashboard groups it under.</param>
 /// <param name="Enabled">Whether the module is switched on. Drives the toggle in the UI.</param>
 /// <param name="Headline">The single most useful value.</param>
 /// <param name="Detail">Secondary line, if any.</param>
@@ -241,6 +243,7 @@ public sealed record ModuleCardDto(
     string Name,
     string Summary,
     string State,
+    string Category,
     bool Enabled,
     string Headline,
     string? Detail,

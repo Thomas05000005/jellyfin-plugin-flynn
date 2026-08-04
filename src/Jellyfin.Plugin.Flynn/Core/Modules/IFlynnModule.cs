@@ -24,6 +24,9 @@ public interface IFlynnModule
     /// <summary>Gets the one-line description shown under <see cref="DisplayName"/>.</summary>
     string Summary { get; }
 
+    /// <summary>Gets the shelf this module belongs on, which is how the dashboard groups it.</summary>
+    ModuleCategory Category { get; }
+
     /// <summary>
     /// Gets a value indicating whether this module is on before the admin has touched anything.
     /// <para>

@@ -82,6 +82,17 @@ public static class StringKeys
     /// <summary>Admin page chrome: <c>ui.toggle-failed</c>.</summary>
     public const string UiToggleFailed = "ui.toggle-failed";
 
+    /// <summary>Dashboard category heading: <c>ui.cat.operations</c>.</summary>
+    public const string UiCatOperations = "ui.cat.operations";
+    /// <summary>Dashboard category heading: <c>ui.cat.system</c>.</summary>
+    public const string UiCatSystem = "ui.cat.system";
+    /// <summary>Dashboard category heading: <c>ui.cat.library</c>.</summary>
+    public const string UiCatLibrary = "ui.cat.library";
+    /// <summary>Dashboard category heading: <c>ui.cat.music</c>.</summary>
+    public const string UiCatMusic = "ui.cat.music";
+    /// <summary>Dashboard category heading: <c>ui.cat.people</c>.</summary>
+    public const string UiCatPeople = "ui.cat.people";
+
     /// <summary>Gets every key defined above, for catalogue completeness checks.</summary>
     public static IReadOnlyList<string> All { get; } =
     [
@@ -113,5 +124,10 @@ public static class StringKeys
         UiWithheldSnoozed,
         UiWithheldResolved,
         UiToggleFailed,
+        UiCatOperations,
+        UiCatSystem,
+        UiCatLibrary,
+        UiCatMusic,
+        UiCatPeople,
     ];
 }

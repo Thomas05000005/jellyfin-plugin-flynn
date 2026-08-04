@@ -112,9 +112,29 @@
                 return;
             }
 
-            host.innerHTML = (!data.Modules || data.Modules.length === 0)
-                ? '<p class="fieldDescription">' + esc(t('ui.no-modules')) + '</p>'
-                : data.Modules.map(card).join('');
+            if (!data.Modules || data.Modules.length === 0) {
+                host.innerHTML = '<p class="fieldDescription">' + esc(t('ui.no-modules')) + '</p>';
+                return;
+            }
+
+            // Grouped in a fixed order rather than in whatever order the server enumerated, so a
+            // module appearing or disappearing never reshuffles the shelves around it.
+            var ORDER = ['Operations', 'System', 'Library', 'Music', 'People'];
+            var groups = {};
+            data.Modules.forEach(function (m) {
+                (groups[m.Category] = groups[m.Category] || []).push(m);
+            });
+
+            host.innerHTML = ORDER.filter(function (name) {
+                return groups[name] && groups[name].length;
+            }).map(function (name) {
+                return '<section class="flynn-cat">' +
+                    '<h4 class="flynn-cat-title">' + esc(t('ui.cat.' + name.toLowerCase())) +
+                    '<span class="flynn-cat-count">' + groups[name].length + '</span></h4>' +
+                    '<div class="flynn-grid">' + groups[name].map(card).join('') + '</div>' +
+                    '</section>';
+            }).join('');
+
             bindToggles(page);
         }, function () {
             host.innerHTML = '<p class="fieldDescription">' + esc(t('ui.unreachable')) + '</p>';
