@@ -148,19 +148,37 @@ public sealed class StorageModuleTests : IAsyncLifetime
     /// code and everything about the machine it ran on.
     /// </summary>
     [Theory]
-    [InlineData(0, 0d, "B")]
-    [InlineData(-5, 0d, "B")]
-    [InlineData(512, 512d, "B")]
-    [InlineData(1024, 1d, "KB")]
-    [InlineData(1536, 2d, "KB")]
-    [InlineData(1099511627776L, 1d, "TB")]
-    [InlineData(4_617_089_444_659L, 4.2d, "TB")]
-    public void ByteCounts_AreScaledButNotFormatted(long bytes, double value, string unit)
+    [InlineData(0, 0d, StringKeys.UnitBytes)]
+    [InlineData(-5, 0d, StringKeys.UnitBytes)]
+    [InlineData(512, 512d, StringKeys.UnitBytes)]
+    [InlineData(1024, 1d, StringKeys.UnitKilobytes)]
+    [InlineData(1536, 2d, StringKeys.UnitKilobytes)]
+    [InlineData(1099511627776L, 1d, StringKeys.UnitTerabytes)]
+    [InlineData(4_617_089_444_659L, 4.2d, StringKeys.UnitTerabytes)]
+    public void ByteCounts_AreScaledButNotFormatted(long bytes, double value, string unitKey)
     {
         var scaled = StorageModule.ScaleBytes(bytes);
 
         Assert.Equal(value, scaled.Value);
-        Assert.Equal(unit, scaled.Unit);
+        Assert.Equal(unitKey, scaled.UnitKey);
+    }
+
+    /// <summary>
+    /// The unit is translated too. A French reader seeing "19,5 TB" gets a French number under an
+    /// English unit, which is the same half-translated page the chrome keys were meant to fix.
+    /// </summary>
+    [Fact]
+    public void TheUnit_IsTranslatedAlongsideTheNumber()
+    {
+        var scaled = StorageModule.ScaleBytes(21_440_476_741_632L);
+        var text = LocalizedText.Of(
+            StringKeys.StorageHeadline, scaled.Value, LocalizedText.Of(scaled.UnitKey));
+
+        var french = text.Resolve(FlynnStrings.ForCulture(new System.Globalization.CultureInfo("fr-FR")));
+        var english = text.Resolve(FlynnStrings.ForCulture(new System.Globalization.CultureInfo("en-GB")));
+
+        Assert.Contains("19,5 To", french, StringComparison.Ordinal);
+        Assert.Contains("19.5 TB", english, StringComparison.Ordinal);
     }
 
     /// <summary>

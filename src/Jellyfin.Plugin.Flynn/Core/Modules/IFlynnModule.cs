@@ -18,11 +18,18 @@ public interface IFlynnModule
     /// </summary>
     string Id { get; }
 
-    /// <summary>Gets the name shown on the module's dashboard card.</summary>
-    string DisplayName { get; }
+    /// <summary>
+    /// Gets the translation key for the name shown on the module's card.
+    /// <para>
+    /// A key rather than the name itself, because a module's own name and description are as
+    /// user-facing as anything it reports. Leaving them as literals is how a page ends up with a
+    /// French headline sitting under an English title.
+    /// </para>
+    /// </summary>
+    string NameKey { get; }
 
-    /// <summary>Gets the one-line description shown under <see cref="DisplayName"/>.</summary>
-    string Summary { get; }
+    /// <summary>Gets the translation key for the one-line description shown under the name.</summary>
+    string SummaryKey { get; }
 
     /// <summary>Gets the shelf this module belongs on, which is how the dashboard groups it.</summary>
     ModuleCategory Category { get; }

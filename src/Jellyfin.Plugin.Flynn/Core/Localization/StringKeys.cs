@@ -93,6 +93,30 @@ public static class StringKeys
     /// <summary>Dashboard category heading: <c>ui.cat.people</c>.</summary>
     public const string UiCatPeople = "ui.cat.people";
 
+    /// <summary>The Storage module's display name.</summary>
+    public const string StorageName = "storage.name";
+
+    /// <summary>The Storage module's one-line description.</summary>
+    public const string StorageSummary = "storage.summary";
+
+    /// <summary>Size unit: bytes.</summary>
+    public const string UnitBytes = "unit.bytes";
+
+    /// <summary>Size unit: kilobytes.</summary>
+    public const string UnitKilobytes = "unit.kilobytes";
+
+    /// <summary>Size unit: megabytes.</summary>
+    public const string UnitMegabytes = "unit.megabytes";
+
+    /// <summary>Size unit: gigabytes.</summary>
+    public const string UnitGigabytes = "unit.gigabytes";
+
+    /// <summary>Size unit: terabytes.</summary>
+    public const string UnitTerabytes = "unit.terabytes";
+
+    /// <summary>Size unit: petabytes.</summary>
+    public const string UnitPetabytes = "unit.petabytes";
+
     /// <summary>Gets every key defined above, for catalogue completeness checks.</summary>
     public static IReadOnlyList<string> All { get; } =
     [
@@ -129,5 +153,13 @@ public static class StringKeys
         UiCatLibrary,
         UiCatMusic,
         UiCatPeople,
+        StorageName,
+        StorageSummary,
+        UnitBytes,
+        UnitKilobytes,
+        UnitMegabytes,
+        UnitGigabytes,
+        UnitTerabytes,
+        UnitPetabytes,
     ];
 }

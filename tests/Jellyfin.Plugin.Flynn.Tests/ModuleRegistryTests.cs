@@ -95,9 +95,9 @@ public class ModuleRegistryTests
 
         public string Id => "healthy";
 
-        public string DisplayName => "Healthy";
+        public string NameKey => "test.Healthy.name";
 
-        public string Summary => "Reports fine.";
+        public string SummaryKey => "test.summary";
 
         public ModuleCategory Category => ModuleCategory.System;
 
@@ -121,9 +121,9 @@ public class ModuleRegistryTests
 
         public string Id => "throwing";
 
-        public string DisplayName => "Throwing";
+        public string NameKey => "test.Throwing.name";
 
-        public string Summary => "Always blows up.";
+        public string SummaryKey => "test.summary";
 
         public ModuleCategory Category => ModuleCategory.System;
 
@@ -137,9 +137,9 @@ public class ModuleRegistryTests
     {
         public string Id => "hanging";
 
-        public string DisplayName => "Hanging";
+        public string NameKey => "test.Hanging.name";
 
-        public string Summary => "Never returns on its own.";
+        public string SummaryKey => "test.summary";
 
         public ModuleCategory Category => ModuleCategory.System;
 

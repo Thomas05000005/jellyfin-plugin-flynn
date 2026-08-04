@@ -31,5 +31,13 @@
   "ui.cat.system": "System",
   "ui.cat.library": "Library",
   "ui.cat.music": "Music",
-  "ui.cat.people": "People"
+  "ui.cat.people": "People",
+  "storage.name": "Storage",
+  "storage.summary": "How much your libraries hold, and how much room is left.",
+  "unit.bytes": "B",
+  "unit.kilobytes": "KB",
+  "unit.megabytes": "MB",
+  "unit.gigabytes": "GB",
+  "unit.terabytes": "TB",
+  "unit.petabytes": "PB"
 }

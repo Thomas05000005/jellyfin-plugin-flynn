@@ -24,6 +24,14 @@ public sealed record LocalizedText(string Key, IReadOnlyList<object?> Args)
     public string Resolve(FlynnStrings strings)
     {
         ArgumentNullException.ThrowIfNull(strings);
-        return strings.Get(Key, [.. Args]);
+
+        // An argument can itself be translatable -- a size and its unit, a count and the thing
+        // being counted. Resolving nested text here keeps the unit out of the caller's hands, so
+        // "19.5 TB" and "19,5 To" come from the same computation.
+        var resolved = Args
+            .Select(arg => arg is LocalizedText nested ? nested.Resolve(strings) : arg)
+            .ToArray();
+
+        return strings.Get(Key, resolved);
     }
 }

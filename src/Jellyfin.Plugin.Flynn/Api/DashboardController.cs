@@ -66,8 +66,8 @@ public sealed class DashboardController : ControllerBase
             var module = _modules.Modules.First(m => m.Id == card.ModuleId);
             return new ModuleCardDto(
                 card.ModuleId,
-                module.DisplayName,
-                module.Summary,
+                strings.Get(module.NameKey),
+                strings.Get(module.SummaryKey),
                 card.State.ToString(),
                 module.Category.ToString(),
                 card.State != ModuleState.Disabled,

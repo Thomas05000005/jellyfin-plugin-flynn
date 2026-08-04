@@ -30,10 +30,10 @@ public sealed class StorageModule : IFlynnModule
     public string Id => "storage";
 
     /// <inheritdoc />
-    public string DisplayName => "Storage";
+    public string NameKey => StringKeys.StorageName;
 
     /// <inheritdoc />
-    public string Summary => "How much your libraries hold, and how much room is left.";
+    public string SummaryKey => StringKeys.StorageSummary;
 
     /// <inheritdoc />
     public ModuleCategory Category => ModuleCategory.System;
@@ -79,7 +79,7 @@ public sealed class StorageModule : IFlynnModule
         return new ModuleCard(
             Id,
             ModuleState.Healthy,
-            LocalizedText.Of(StringKeys.StorageHeadline, scaled.Value, scaled.Unit),
+            LocalizedText.Of(StringKeys.StorageHeadline, scaled.Value, LocalizedText.Of(scaled.UnitKey)),
             detail,
             snapshot.TakenAt);
     }
@@ -99,20 +99,24 @@ public sealed class StorageModule : IFlynnModule
     /// </summary>
     /// <param name="bytes">The count.</param>
     /// <returns>
-    /// The scaled value, already rounded for display, and its unit. One decimal from GB upward and
+    /// The scaled value, already rounded for display, and the translation KEY for its unit. One decimal from GB upward and
     /// none below: "512.0 MB" reads worse than "512 MB", while "4 TB" hides hundreds of gigabytes.
     /// </returns>
-    internal static (double Value, string Unit) ScaleBytes(long bytes)
+    internal static (double Value, string UnitKey) ScaleBytes(long bytes)
     {
         if (bytes <= 0)
         {
-            return (0, "B");
+            return (0, StringKeys.UnitBytes);
         }
 
-        string[] units = ["B", "KB", "MB", "GB", "TB", "PB"];
-        var order = Math.Min((int)Math.Floor(Math.Log(bytes, 1024)), units.Length - 1);
+        string[] unitKeys =
+        [
+            StringKeys.UnitBytes, StringKeys.UnitKilobytes, StringKeys.UnitMegabytes,
+            StringKeys.UnitGigabytes, StringKeys.UnitTerabytes, StringKeys.UnitPetabytes,
+        ];
+        var order = Math.Min((int)Math.Floor(Math.Log(bytes, 1024)), unitKeys.Length - 1);
         var size = bytes / Math.Pow(1024, order);
 
-        return (Math.Round(size, order >= 3 ? 1 : 0), units[order]);
+        return (Math.Round(size, order >= 3 ? 1 : 0), unitKeys[order]);
     }
 }

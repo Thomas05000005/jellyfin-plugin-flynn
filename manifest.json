@@ -9,6 +9,14 @@
         "imageUrl": "",
         "versions": [
             {
+                "version": "0.2.1.0",
+                "changelog": "Finishes the French translation. The page was showing accentless text -- Degrade, a l'instant -- and the size unit stayed English, so a French reader got 19,5 TB with a French comma and an English unit. Module names and descriptions were English literals too. Everything user-facing now comes from the catalogue, units included. Requires Jellyfin 12.0 or later.",
+                "targetAbi": "12.0.0.0",
+                "sourceUrl": "https://github.com/Thomas05000005/jellyfin-plugin-flynn/releases/download/v0.2.1/Flynn-v0.2.1.zip",
+                "checksum": "PLACEHOLDER_RECOMPUTE_AFTER_BUILD",
+                "timestamp": "2026-08-04T00:00:00.0000000Z"
+            },
+            {
                 "version": "0.2.0.0",
                 "changelog": "Modules are now grouped by category on the dashboard, so the page stays readable as more of them arrive. Gives Flynn a look of its own: cyan for normal, amber for attention, on cards that lift slightly off the page. Colours are accents only -- edges, dots, the switch -- never the surface text sits on, so light Jellyfin themes stay readable. Requires Jellyfin 12.0 or later.",
                 "targetAbi": "12.0.0.0",
