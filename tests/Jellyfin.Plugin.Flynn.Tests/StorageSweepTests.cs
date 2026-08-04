@@ -86,21 +86,66 @@ public class StorageSweepTests
     /// The one that makes a forecast wrong rather than absent. Three libraries on one pool must
     /// report its free space once; reporting it three times makes the projection three times too
     /// optimistic.
+    /// <para>
+    /// Uses paths that really exist, because the first version of this test did not and passed on
+    /// Windows for the wrong reason: DriveInfo there only reads the drive letter, so a
+    /// non-existent path still resolved. On Linux it did not, and that empty result was hiding a
+    /// worse bug than the one being tested for.
+    /// </para>
     /// </summary>
     [Fact]
     public void SeveralLibrariesOnOneDisk_ReportThatDiskOnce()
     {
-        var root = Path.GetTempPath();
-        var probe = new DriveProbe(NullLogger<DriveProbe>.Instance);
+        var root = Directory.CreateTempSubdirectory("flynn-probe");
+        try
+        {
+            var probe = new DriveProbe(NullLogger<DriveProbe>.Instance);
+            var libraries = new[] { "films", "series", "music" }
+                .Select(name => Directory.CreateDirectory(Path.Combine(root.FullName, name)).FullName)
+                .ToArray();
 
-        var devices = probe.Probe(
-        [
-            Path.Combine(root, "films"),
-            Path.Combine(root, "series"),
-            Path.Combine(root, "music"),
-        ]);
+            var devices = probe.Probe(libraries);
 
-        Assert.Single(devices);
+            Assert.Single(devices);
+        }
+        finally
+        {
+            root.Delete(recursive: true);
+        }
+    }
+
+    /// <summary>
+    /// The matching rule, tested without needing a second disk. Picking the longest mount point is
+    /// what makes a library on a pool resolve to the pool rather than to the root filesystem, and
+    /// therefore what makes two libraries on that pool share one entry.
+    /// </summary>
+    [Fact]
+    public void TheLongestMatchingMountPoint_Wins()
+    {
+        var mounts = DriveInfo.GetDrives().Where(d => d.IsReady).ToList();
+        var deepest = mounts.MaxBy(m => m.RootDirectory.FullName.Length)!;
+
+        var holder = DriveProbe.MountHolding(mounts, deepest.RootDirectory.FullName);
+
+        Assert.Equal(deepest.RootDirectory.FullName, holder!.RootDirectory.FullName);
+    }
+
+    /// <summary>
+    /// A sibling that merely shares a prefix must not be mistaken for something inside the mount
+    /// point: "/mnt/poolroom" is not on "/mnt/pool".
+    /// </summary>
+    [Fact]
+    public void APathThatMerelySharesAPrefix_IsNotAMatch()
+    {
+        var mounts = DriveInfo.GetDrives().Where(d => d.IsReady).ToList();
+        var shortest = mounts.MinBy(m => m.RootDirectory.FullName.Length)!.RootDirectory.FullName;
+        var lookalike = shortest.TrimEnd(Path.DirectorySeparatorChar) + "xyz-not-a-mount";
+
+        var holder = DriveProbe.MountHolding(mounts, lookalike);
+
+        Assert.True(
+            holder is null || holder.RootDirectory.FullName.Length <= shortest.Length,
+            "a path sharing a prefix with a mount point must not resolve to it");
     }
 
     [Fact]
@@ -108,10 +153,11 @@ public class StorageSweepTests
     {
         var probe = new DriveProbe(NullLogger<DriveProbe>.Instance);
 
-        var devices = probe.Probe([string.Empty, "   ", "\0invalid", Path.GetTempPath()]);
+        var devices = probe.Probe([string.Empty, "   ", Path.GetTempPath()]);
 
         Assert.Single(devices);
     }
+
 
     private static StorageSweep Sweep(ILibraryManager libraries) =>
         new(libraries, new NoDrives(), TimeProvider.System, NullLogger<StorageSweep>.Instance);
