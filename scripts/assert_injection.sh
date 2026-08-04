@@ -11,8 +11,23 @@ MARKER='id="flynn-client"'
 
 fail() { echo "::error::$1"; exit 1; }
 
+# Fetched with retries. The server answers /System/Info/Public before Kestrel has settled, and a
+# first request can still come back as a connection reset. rc3 and rc4 ran the same commit on the
+# same run and only one of them saw it, which is what transient looks like.
+fetch() {
+  local url="$1" body=""
+  for _ in $(seq 1 20); do
+    if body="$(curl -fsSL --max-time 30 "$url" 2>/dev/null)"; then
+      printf '%s' "$body"
+      return 0
+    fi
+    sleep 2
+  done
+  return 1
+}
+
 for path in "/web/index.html" "/"; do
-  body="$(curl -fsSL --max-time 30 "${BASE}${path}")" || fail "GET ${path} failed"
+  body="$(fetch "${BASE}${path}")" || fail "GET ${path} never answered after 40s of retries"
 
   count="$(grep -c "$MARKER" <<< "$body" || true)"
   if [ "$count" -eq 0 ]; then
@@ -32,7 +47,7 @@ for path in "/web/index.html" "/"; do
 done
 
 # The tag is worthless if what it points at is a 404.
-src="$(grep -o 'src="/Flynn/client\.js?v=[^"]*"' <<< "$(curl -fsSL --max-time 30 "${BASE}/web/index.html")" | head -1 | sed 's/^src="//; s/"$//')"
+src="$(grep -o 'src="/Flynn/client\.js?v=[^"]*"' <<< "$(fetch "${BASE}/web/index.html")" | head -1 | sed 's/^src="//; s/"$//')"
 [ -n "$src" ] || fail "Could not read the script src out of the rewritten document."
 
 # Retried, for the same reason the database check is: the server answers the SPA shell before its
@@ -56,7 +71,7 @@ fi
 echo "  ${src}: 200"
 
 # An API response must never be touched. If the path filter is too broad, this is where it shows.
-json="$(curl -fsSL --max-time 30 "${BASE}/System/Info/Public")"
+json="$(fetch "${BASE}/System/Info/Public")" || fail "the public info endpoint never answered"
 if grep -q "$MARKER" <<< "$json"; then
   fail "A JSON API response was rewritten. The path filter is too broad."
 fi
