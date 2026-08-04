@@ -9,6 +9,14 @@
         "imageUrl": "",
         "versions": [
             {
+                "version": "0.1.1.0",
+                "changelog": "Fixes a defect that made v0.1.0 useless: modules showed as Disabled with no way to switch them on. A module the admin has never configured now falls back to its own default rather than to off, and every card has a toggle. The admin page also had English hard-coded in its script; all of its labels now come from the same catalogue as everything else, so the whole page follows your language instead of half of it.",
+                "targetAbi": "12.0.0.0",
+                "sourceUrl": "https://github.com/Thomas05000005/jellyfin-plugin-flynn/releases/download/v0.1.1/Flynn-v0.1.1.zip",
+                "checksum": "PLACEHOLDER_RECOMPUTE_AFTER_BUILD",
+                "timestamp": "2026-08-04T00:00:00.0000000Z"
+            },
+            {
                 "version": "0.1.0.0",
                 "changelog": "First installable build. Adds the Storage module: how much each library holds and how much room is left on each device, measured nightly at 03:15. Needs no third-party plugin -- Flynn delivers its own client script, unlike the JavaScript Injector route which has no Jellyfin 12 build. Changes nothing by default: the write level starts at none and every module is read-only. Requires Jellyfin 12.0 or later.",
                 "targetAbi": "12.0.0.0",

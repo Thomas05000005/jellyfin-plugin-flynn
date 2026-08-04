@@ -25,6 +25,20 @@ public interface IFlynnModule
     string Summary { get; }
 
     /// <summary>
+    /// Gets a value indicating whether this module is on before the admin has touched anything.
+    /// <para>
+    /// A module the admin has never configured falls back to this rather than to off. Defaulting
+    /// everything to off ships a plugin that does nothing on a fresh install, which reads as
+    /// broken rather than as cautious.
+    /// </para>
+    /// <para>
+    /// True for anything that only reads. Anything that could write starts false regardless, since
+    /// the write level gates it as well.
+    /// </para>
+    /// </summary>
+    bool EnabledByDefault { get; }
+
+    /// <summary>
     /// Builds the module's dashboard card.
     /// <para>
     /// Called on page load, so it must be cheap: read pre-computed values, never scan the library

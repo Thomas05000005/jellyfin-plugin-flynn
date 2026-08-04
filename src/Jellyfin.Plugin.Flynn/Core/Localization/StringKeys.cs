@@ -43,6 +43,45 @@ public static class StringKeys
     /// <summary>Shown when the module cannot reach its own storage.</summary>
     public const string StorageUnavailable = "storage.unavailable";
 
+    /// <summary>Admin page chrome: <c>ui.modules</c>.</summary>
+    public const string UiModules = "ui.modules";
+    /// <summary>Admin page chrome: <c>ui.attention</c>.</summary>
+    public const string UiAttention = "ui.attention";
+    /// <summary>Admin page chrome: <c>ui.nothing-to-do</c>.</summary>
+    public const string UiNothingToDo = "ui.nothing-to-do";
+    /// <summary>Admin page chrome: <c>ui.no-modules</c>.</summary>
+    public const string UiNoModules = "ui.no-modules";
+    /// <summary>Admin page chrome: <c>ui.unreachable</c>.</summary>
+    public const string UiUnreachable = "ui.unreachable";
+    /// <summary>Admin page chrome: <c>ui.storage-down</c>.</summary>
+    public const string UiStorageDown = "ui.storage-down";
+    /// <summary>Admin page chrome: <c>ui.storage-down-detail</c>.</summary>
+    public const string UiStorageDownDetail = "ui.storage-down-detail";
+    /// <summary>Admin page chrome: <c>ui.state.disabled</c>.</summary>
+    public const string UiStateDisabled = "ui.state.disabled";
+    /// <summary>Admin page chrome: <c>ui.state.healthy</c>.</summary>
+    public const string UiStateHealthy = "ui.state.healthy";
+    /// <summary>Admin page chrome: <c>ui.state.degraded</c>.</summary>
+    public const string UiStateDegraded = "ui.state.degraded";
+    /// <summary>Admin page chrome: <c>ui.state.failed</c>.</summary>
+    public const string UiStateFailed = "ui.state.failed";
+    /// <summary>Admin page chrome: <c>ui.just-now</c>.</summary>
+    public const string UiJustNow = "ui.just-now";
+    /// <summary>Admin page chrome: <c>ui.minutes-ago</c>.</summary>
+    public const string UiMinutesAgo = "ui.minutes-ago";
+    /// <summary>Admin page chrome: <c>ui.hours-ago</c>.</summary>
+    public const string UiHoursAgo = "ui.hours-ago";
+    /// <summary>Admin page chrome: <c>ui.days-ago</c>.</summary>
+    public const string UiDaysAgo = "ui.days-ago";
+    /// <summary>Admin page chrome: <c>ui.withheld.dismissed</c>.</summary>
+    public const string UiWithheldDismissed = "ui.withheld.dismissed";
+    /// <summary>Admin page chrome: <c>ui.withheld.snoozed</c>.</summary>
+    public const string UiWithheldSnoozed = "ui.withheld.snoozed";
+    /// <summary>Admin page chrome: <c>ui.withheld.resolved</c>.</summary>
+    public const string UiWithheldResolved = "ui.withheld.resolved";
+    /// <summary>Admin page chrome: <c>ui.toggle-failed</c>.</summary>
+    public const string UiToggleFailed = "ui.toggle-failed";
+
     /// <summary>Gets every key defined above, for catalogue completeness checks.</summary>
     public static IReadOnlyList<string> All { get; } =
     [
@@ -55,5 +94,24 @@ public static class StringKeys
         StorageTightestDevice,
         StorageNoSnapshotYet,
         StorageUnavailable,
+        UiModules,
+        UiAttention,
+        UiNothingToDo,
+        UiNoModules,
+        UiUnreachable,
+        UiStorageDown,
+        UiStorageDownDetail,
+        UiStateDisabled,
+        UiStateHealthy,
+        UiStateDegraded,
+        UiStateFailed,
+        UiJustNow,
+        UiMinutesAgo,
+        UiHoursAgo,
+        UiDaysAgo,
+        UiWithheldDismissed,
+        UiWithheldSnoozed,
+        UiWithheldResolved,
+        UiToggleFailed,
     ];
 }

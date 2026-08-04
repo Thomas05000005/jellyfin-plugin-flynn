@@ -36,6 +36,9 @@ public sealed class StorageModule : IFlynnModule
     public string Summary => "How much your libraries hold, and how much room is left.";
 
     /// <inheritdoc />
+    public bool EnabledByDefault => true;
+
+    /// <inheritdoc />
     public async Task<ModuleCard> BuildCardAsync(CancellationToken cancellationToken)
     {
         if (!_readiness.IsReady)

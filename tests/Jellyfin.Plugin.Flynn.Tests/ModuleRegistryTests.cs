@@ -99,6 +99,8 @@ public class ModuleRegistryTests
 
         public string Summary => "Reports fine.";
 
+        public bool EnabledByDefault => true;
+
         public Task<ModuleCard> BuildCardAsync(CancellationToken cancellationToken)
         {
             WasCalled = true;
@@ -121,6 +123,8 @@ public class ModuleRegistryTests
 
         public string Summary => "Always blows up.";
 
+        public bool EnabledByDefault => true;
+
         public Task<ModuleCard> BuildCardAsync(CancellationToken cancellationToken) =>
             throw new InvalidOperationException(SecretInMessage);
     }
@@ -132,6 +136,8 @@ public class ModuleRegistryTests
         public string DisplayName => "Hanging";
 
         public string Summary => "Never returns on its own.";
+
+        public bool EnabledByDefault => true;
 
         public async Task<ModuleCard> BuildCardAsync(CancellationToken cancellationToken)
         {

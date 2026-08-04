@@ -1,5 +1,5 @@
-<!-- Admin shell. Intentionally almost empty: everything below is rendered from what the server
-     reports, so adding a module never means editing this file.
+<!-- Admin shell. Deliberately almost empty: every label below is fetched from the server so that
+     adding a module, or a language, never means editing this file.
 
      The script and stylesheet are referenced by URL rather than inlined because a browser sends no
      authorization header for these tags. They carry no data; every call they make afterwards hits
@@ -10,20 +10,18 @@
 
       <link rel="stylesheet" href="/Flynn/admin.css" />
 
-      <div class="verticalSection">
-        <h2 class="sectionTitle">Flynn</h2>
-        <p class="fieldDescription">He fights for the Users.</p>
+      <div class="flynn-header">
+        <h2 class="flynn-title">Flynn</h2>
+        <span class="flynn-tagline">He fights for the Users.</span>
       </div>
 
-      <div class="verticalSection">
-        <h3 class="sectionTitle">Modules</h3>
-        <div id="flynnModuleCards" class="flynn-grid">
-          <p class="fieldDescription">Loading...</p>
-        </div>
+      <div class="flynn-section">
+        <h3 class="flynn-section-title" data-flynn-label="ui.modules">Modules</h3>
+        <div id="flynnModuleCards" class="flynn-grid"></div>
       </div>
 
-      <div class="verticalSection">
-        <h3 class="sectionTitle">Needs your attention</h3>
+      <div class="flynn-section">
+        <h3 class="flynn-section-title" data-flynn-label="ui.attention">Needs your attention</h3>
         <div id="flynnIssues"></div>
       </div>
 

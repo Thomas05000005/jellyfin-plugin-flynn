@@ -1,3 +1,4 @@
+using Jellyfin.Plugin.Flynn.Configuration;
 using Jellyfin.Plugin.Flynn.Core.Config;
 using Jellyfin.Plugin.Flynn.Core.Data;
 using Jellyfin.Plugin.Flynn.Core.Issues;
@@ -53,8 +54,11 @@ public sealed class DashboardController : ControllerBase
         var strings = FlynnStrings.ForCulture(RequestCulture.For(Request));
         var enabled = _config.Current.Modules;
 
+        // A module the admin has never touched falls back to its own default, not to off. The
+        // absence of a saved preference is "not asked yet", not "asked and declined".
         var cards = await _modules.BuildCardsAsync(
-            id => enabled.FirstOrDefault(m => m.Id == id)?.Enabled ?? false,
+            id => enabled.FirstOrDefault(m => m.Id == id)?.Enabled
+                  ?? _modules.Modules.First(m => m.Id == id).EnabledByDefault,
             cancellationToken).ConfigureAwait(false);
 
         var dtos = cards.Select(card =>
@@ -65,6 +69,7 @@ public sealed class DashboardController : ControllerBase
                 module.DisplayName,
                 module.Summary,
                 card.State.ToString(),
+                card.State != ModuleState.Disabled,
                 card.Headline.Resolve(strings),
                 card.Detail?.Resolve(strings),
                 card.GeneratedAt);
@@ -110,6 +115,64 @@ public sealed class DashboardController : ControllerBase
             counts.GetValueOrDefault(IssueState.Dismissed),
             counts.GetValueOrDefault(IssueState.Snoozed),
             counts.GetValueOrDefault(IssueState.Resolved));
+    }
+
+    /// <summary>
+    /// Returns every user-facing string, resolved for the caller's language.
+    /// <para>
+    /// The admin page has chrome of its own -- section titles, relative times, state labels -- and
+    /// hard-coding it in the script would leave half the page in English while the other half
+    /// followed the reader. One catalogue, one source of truth, resolved in one place.
+    /// </para>
+    /// </summary>
+    /// <returns>Key to text, for this reader.</returns>
+    [HttpGet("strings")]
+    public ActionResult<IReadOnlyDictionary<string, string>> GetStrings()
+    {
+        var strings = FlynnStrings.ForCulture(RequestCulture.For(Request));
+        // The lambda is explicit because Get takes params, so a method group binds to the
+        // comparer overload of ToDictionary instead of the selector.
+        return StringKeys.All.ToDictionary(key => key, key => strings.Get(key));
+    }
+
+    /// <summary>
+    /// Switches a module on or off.
+    /// <para>
+    /// Goes through the ConfigStore rather than touching the configuration object, so two admins
+    /// toggling different modules at the same time cannot lose each other's change.
+    /// </para>
+    /// </summary>
+    /// <param name="moduleId">The module's id.</param>
+    /// <param name="enabled">Whether it should run.</param>
+    /// <param name="cancellationToken">Cancellation token.</param>
+    /// <returns>No content, or 404 for an unknown module.</returns>
+    [HttpPost("modules/{moduleId}/enabled")]
+    public async Task<ActionResult> SetModuleEnabled(
+        string moduleId,
+        [FromQuery] bool enabled,
+        CancellationToken cancellationToken)
+    {
+        if (_modules.Modules.All(m => m.Id != moduleId))
+        {
+            return NotFound();
+        }
+
+        await _config.MutateAsync(
+            config =>
+            {
+                var toggle = config.Modules.FirstOrDefault(m => m.Id == moduleId);
+                if (toggle is null)
+                {
+                    config.Modules.Add(new ModuleToggle { Id = moduleId, Enabled = enabled });
+                }
+                else
+                {
+                    toggle.Enabled = enabled;
+                }
+            },
+            cancellationToken).ConfigureAwait(false);
+
+        return NoContent();
     }
 
     /// <summary>Stops an issue from ever coming back on its own.</summary>
@@ -169,6 +232,7 @@ public sealed record DashboardDto(
 /// <param name="Name">Display name.</param>
 /// <param name="Summary">One line about what the module does.</param>
 /// <param name="State">Disabled, Healthy, Degraded or Failed.</param>
+/// <param name="Enabled">Whether the module is switched on. Drives the toggle in the UI.</param>
 /// <param name="Headline">The single most useful value.</param>
 /// <param name="Detail">Secondary line, if any.</param>
 /// <param name="GeneratedAt">When the underlying data was computed.</param>
@@ -177,6 +241,7 @@ public sealed record ModuleCardDto(
     string Name,
     string Summary,
     string State,
+    bool Enabled,
     string Headline,
     string? Detail,
     DateTimeOffset GeneratedAt);

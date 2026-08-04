@@ -3,27 +3,29 @@
  *
  * PURE ASCII ONLY, same rule as the injected runtime: use \uXXXX escapes. A CI gate enforces it.
  *
- * Everything on this page is rendered from what the server reports, never from a hard-coded list
- * of modules. Adding a module must not mean editing this file.
+ * Everything here is rendered from what the server reports, including its own labels. Adding a
+ * module must not mean editing this file, and neither must adding a language.
  */
 (function () {
     'use strict';
 
     var API = '/Flynn';
+    var K = {};
 
-    function request(path, options) {
-        var opts = options || {};
-        opts.headers = opts.headers || {};
-        // ApiClient exists on the Jellyfin admin page and holds the session token; without it
-        // every call here would come back 401.
+    function call(path, method) {
         return window.ApiClient.ajax({
-            type: opts.type || 'GET',
+            type: method || 'GET',
             url: window.ApiClient.getUrl(path.replace(/^\//, '')),
-            dataType: opts.dataType === null ? undefined : 'json'
+            dataType: method === 'POST' ? undefined : 'json'
         });
     }
 
-    function text(value) {
+    function t(key, value) {
+        var text = K[key] || '[' + key + ']';
+        return value === undefined ? text : text.replace('{0}', value);
+    }
+
+    function esc(value) {
         var node = document.createElement('span');
         node.textContent = value == null ? '' : String(value);
         return node.innerHTML;
@@ -35,109 +37,144 @@
         }
         var seconds = Math.max(0, (Date.now() - new Date(iso).getTime()) / 1000);
         if (seconds < 90) {
-            return 'just now';
+            return t('ui.just-now');
         }
         if (seconds < 5400) {
-            return Math.round(seconds / 60) + ' min ago';
+            return t('ui.minutes-ago', Math.round(seconds / 60));
         }
         if (seconds < 172800) {
-            return Math.round(seconds / 3600) + ' h ago';
+            return t('ui.hours-ago', Math.round(seconds / 3600));
         }
-        return Math.round(seconds / 86400) + ' d ago';
+        return t('ui.days-ago', Math.round(seconds / 86400));
     }
 
-    function renderModules(page, data) {
+    function stateLabel(state) {
+        return t('ui.state.' + String(state).toLowerCase());
+    }
+
+    function card(module) {
+        var state = String(module.State).toLowerCase();
+        return '' +
+            '<div class="flynn-card flynn-' + esc(state) + '" data-module="' + esc(module.Id) + '">' +
+              '<div class="flynn-card-top">' +
+                '<div>' +
+                  '<div class="flynn-card-name">' + esc(module.Name) + '</div>' +
+                  '<div class="flynn-card-summary">' + esc(module.Summary) + '</div>' +
+                '</div>' +
+                '<label class="flynn-switch" title="' + esc(stateLabel(module.State)) + '">' +
+                  '<input type="checkbox"' + (module.Enabled ? ' checked' : '') + ' />' +
+                  '<span class="flynn-slider"></span>' +
+                '</label>' +
+              '</div>' +
+              '<div class="flynn-card-headline">' + esc(module.Headline) + '</div>' +
+              (module.Detail ? '<div class="flynn-card-detail">' + esc(module.Detail) + '</div>' : '') +
+              '<div class="flynn-card-foot">' +
+                '<span class="flynn-dot"></span>' + esc(stateLabel(module.State)) +
+                '<span class="flynn-sep"></span>' + esc(relative(module.GeneratedAt)) +
+              '</div>' +
+            '</div>';
+    }
+
+    function bindToggles(page) {
+        page.querySelectorAll('.flynn-card[data-module] input[type=checkbox]').forEach(function (input) {
+            input.addEventListener('change', function () {
+                var id = input.closest('[data-module]').getAttribute('data-module');
+                input.disabled = true;
+                call(API + '/modules/' + encodeURIComponent(id) + '/enabled?enabled=' + input.checked, 'POST')
+                    .then(function () {
+                        // Re-read rather than patch the DOM: switching a module on changes its
+                        // state, its headline and its timestamp, and guessing all three here is
+                        // how the page starts disagreeing with the server.
+                        loadModules(page);
+                    }, function () {
+                        input.checked = !input.checked;
+                        input.disabled = false;
+                        window.Dashboard && window.Dashboard.alert(t('ui.toggle-failed'));
+                    });
+            });
+        });
+    }
+
+    function loadModules(page) {
         var host = page.querySelector('#flynnModuleCards');
         if (!host) {
             return;
         }
 
-        if (!data.StorageReady) {
-            host.innerHTML =
-                '<div class="flynn-card flynn-failed">' +
-                '<div class="flynn-card-head">Storage unavailable</div>' +
-                '<div class="flynn-card-headline">' + text(data.StorageFailure) + '</div>' +
-                '<div class="flynn-card-detail">Modules that need storage will report as unavailable. ' +
-                'The rest of the server is unaffected.</div>' +
-                '</div>';
-            return;
-        }
+        call(API + '/modules').then(function (data) {
+            if (!data.StorageReady) {
+                host.innerHTML =
+                    '<div class="flynn-card flynn-degraded">' +
+                      '<div class="flynn-card-name">' + esc(t('ui.storage-down')) + '</div>' +
+                      '<div class="flynn-card-headline">' + esc(data.StorageFailure) + '</div>' +
+                      '<div class="flynn-card-detail">' + esc(t('ui.storage-down-detail')) + '</div>' +
+                    '</div>';
+                return;
+            }
 
-        if (!data.Modules || data.Modules.length === 0) {
-            host.innerHTML =
-                '<p class="fieldDescription">No modules are installed yet. ' +
-                'Flynn is running and has nothing to show.</p>';
-            return;
-        }
-
-        host.innerHTML = data.Modules.map(function (card) {
-            return '<div class="flynn-card flynn-' + text(card.State.toLowerCase()) + '">' +
-                '<div class="flynn-card-head">' + text(card.Name) +
-                '<span class="flynn-state">' + text(card.State) + '</span></div>' +
-                '<div class="flynn-card-headline">' + text(card.Headline) + '</div>' +
-                (card.Detail ? '<div class="flynn-card-detail">' + text(card.Detail) + '</div>' : '') +
-                '<div class="flynn-card-foot">' + text(card.Summary) +
-                ' \u00B7 ' + text(relative(card.GeneratedAt)) + '</div>' +
-                '</div>';
-        }).join('');
+            host.innerHTML = (!data.Modules || data.Modules.length === 0)
+                ? '<p class="fieldDescription">' + esc(t('ui.no-modules')) + '</p>'
+                : data.Modules.map(card).join('');
+            bindToggles(page);
+        }, function () {
+            host.innerHTML = '<p class="fieldDescription">' + esc(t('ui.unreachable')) + '</p>';
+        });
     }
 
-    function renderIssues(page, inbox) {
+    function loadIssues(page) {
         var host = page.querySelector('#flynnIssues');
         if (!host) {
             return;
         }
 
-        var withheld = [];
-        // Dismissal is permanent, so the count is the only thing standing between a deliberate
-        // hide and a blind spot. It is shown even when it is the only thing to show.
-        if (inbox.Dismissed) {
-            withheld.push(inbox.Dismissed + ' dismissed');
-        }
-        if (inbox.Snoozed) {
-            withheld.push(inbox.Snoozed + ' snoozed');
-        }
-        if (inbox.Resolved) {
-            withheld.push(inbox.Resolved + ' resolved');
-        }
-        var footer = withheld.length
-            ? '<p class="fieldDescription flynn-withheld">' + text(withheld.join(' \u00B7 ')) + '</p>'
-            : '';
+        call(API + '/issues').then(function (inbox) {
+            var withheld = [];
+            // Dismissal is permanent, so this count is the only thing between a deliberate hide
+            // and a blind spot. Shown even when it is all there is to show.
+            if (inbox.Dismissed) {
+                withheld.push(t('ui.withheld.dismissed', inbox.Dismissed));
+            }
+            if (inbox.Snoozed) {
+                withheld.push(t('ui.withheld.snoozed', inbox.Snoozed));
+            }
+            if (inbox.Resolved) {
+                withheld.push(t('ui.withheld.resolved', inbox.Resolved));
+            }
+            var foot = withheld.length
+                ? '<p class="flynn-withheld">' + esc(withheld.join('  \u00B7  ')) + '</p>'
+                : '';
 
-        if (!inbox.Open || inbox.Open.length === 0) {
-            host.innerHTML = '<p class="fieldDescription">Nothing needs your attention.</p>' + footer;
-            return;
-        }
-
-        host.innerHTML = inbox.Open.map(function (issue) {
-            return '<div class="flynn-issue flynn-' + text(issue.Severity.toLowerCase()) + '">' +
-                '<div class="flynn-issue-title">' + text(issue.Title) + '</div>' +
-                (issue.Detail ? '<div class="flynn-issue-detail">' + text(issue.Detail) + '</div>' : '') +
-                '<div class="flynn-issue-foot">' + text(issue.ModuleId) +
-                ' \u00B7 first seen ' + text(relative(issue.FirstSeen)) + '</div>' +
-                '</div>';
-        }).join('') + footer;
+            host.innerHTML = (!inbox.Open || inbox.Open.length === 0)
+                ? '<p class="fieldDescription flynn-clear">' + esc(t('ui.nothing-to-do')) + '</p>' + foot
+                : inbox.Open.map(function (issue) {
+                    return '<div class="flynn-issue flynn-' + esc(String(issue.Severity).toLowerCase()) + '">' +
+                        '<div class="flynn-issue-title">' + esc(issue.Title) + '</div>' +
+                        (issue.Detail ? '<div class="flynn-issue-detail">' + esc(issue.Detail) + '</div>' : '') +
+                        '<div class="flynn-issue-foot">' + esc(issue.ModuleId) +
+                        '<span class="flynn-sep"></span>' + esc(relative(issue.FirstSeen)) + '</div>' +
+                        '</div>';
+                }).join('') + foot;
+        }, function () {
+            // 503 while storage is down is expected; the module panel already explains it.
+            host.innerHTML = '';
+        });
     }
 
     function load(page) {
-        request(API + '/modules').then(function (data) {
-            renderModules(page, data);
+        // Labels first: everything rendered afterwards needs them, and rendering before they
+        // arrive is what puts [ui.just-now] on screen for a second.
+        call(API + '/strings').then(function (strings) {
+            K = strings || {};
+            // Section titles live in the HTML so the page is not blank before the fetch returns;
+            // they carry their key and get replaced once the catalogue is in.
+            page.querySelectorAll('[data-flynn-label]').forEach(function (node) {
+                node.textContent = t(node.getAttribute('data-flynn-label'));
+            });
+            loadModules(page);
+            loadIssues(page);
         }, function () {
-            var host = page.querySelector('#flynnModuleCards');
-            if (host) {
-                host.innerHTML = '<p class="fieldDescription">Could not reach Flynn. ' +
-                    'Check the server log.</p>';
-            }
-        });
-
-        request(API + '/issues').then(function (inbox) {
-            renderIssues(page, inbox);
-        }, function () {
-            // A 503 here is expected while storage is down; the module panel already explains it.
-            var host = page.querySelector('#flynnIssues');
-            if (host) {
-                host.innerHTML = '';
-            }
+            loadModules(page);
+            loadIssues(page);
         });
     }
 

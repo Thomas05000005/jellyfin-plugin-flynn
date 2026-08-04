@@ -2,66 +2,128 @@
  * Flynn admin page styles.
  *
  * Colours come from Jellyfin's own theme variables wherever one exists, with a fallback. Hard
- * coding white text was a real bug class in the previous plugin: it looked fine in the default
+ * coding white text was a real bug class in the previous plugin: it looked right in the default
  * dark theme and was unreadable in every light one.
  */
 
+.flynn-header {
+    display: flex;
+    align-items: baseline;
+    gap: 0.75rem;
+    flex-wrap: wrap;
+    margin-bottom: 0.25rem;
+}
+
+.flynn-title {
+    font-size: 1.6rem;
+    font-weight: 600;
+    margin: 0;
+}
+
+.flynn-tagline {
+    font-size: 0.9rem;
+    opacity: 0.6;
+    font-style: italic;
+}
+
+.flynn-section {
+    margin-top: 1.75rem;
+}
+
+.flynn-section-title {
+    font-size: 0.78rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    opacity: 0.65;
+    margin: 0 0 0.6rem;
+}
+
 .flynn-grid {
     display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(16rem, 1fr));
+    grid-template-columns: repeat(auto-fill, minmax(19rem, 1fr));
     gap: 0.75rem;
-    margin: 0.5rem 0 1.5rem;
 }
 
 .flynn-card,
 .flynn-issue {
-    border: 1px solid var(--divider-color, rgba(127, 127, 127, 0.35));
-    border-radius: 0.35rem;
-    padding: 0.75rem 0.9rem;
+    border: 1px solid var(--divider-color, rgba(127, 127, 127, 0.3));
+    border-radius: 0.5rem;
+    padding: 0.9rem 1rem;
     color: inherit;
     background: rgba(127, 127, 127, 0.06);
+    transition: border-color 0.15s ease;
 }
 
-.flynn-card-head {
+.flynn-card:hover {
+    border-color: rgba(127, 127, 127, 0.55);
+}
+
+.flynn-card-top {
     display: flex;
-    align-items: baseline;
+    align-items: flex-start;
     justify-content: space-between;
-    gap: 0.5rem;
-    font-weight: 600;
+    gap: 0.75rem;
 }
 
-.flynn-state {
-    font-size: 0.72rem;
-    text-transform: uppercase;
-    letter-spacing: 0.04em;
-    opacity: 0.75;
+.flynn-card-name {
+    font-weight: 600;
+    font-size: 1.02rem;
+}
+
+.flynn-card-summary {
+    font-size: 0.8rem;
+    opacity: 0.65;
+    margin-top: 0.1rem;
+    max-width: 22rem;
 }
 
 .flynn-card-headline {
-    font-size: 1.5rem;
-    line-height: 1.2;
-    margin: 0.35rem 0;
+    font-size: 1.7rem;
+    line-height: 1.15;
+    margin: 0.7rem 0 0.15rem;
 }
 
 .flynn-card-detail,
 .flynn-issue-detail {
     font-size: 0.85rem;
-    /* 0.7 rather than the 0.45 the previous plugin used: below that it fails WCAG AA on the
-       default surface, and helper text is exactly the text people need most. */
+    /* 0.7, not the 0.45 the previous plugin used: below that it fails WCAG AA on the default
+       surface, and helper text is exactly the text people need most. */
     opacity: 0.7;
 }
 
 .flynn-card-foot,
 .flynn-issue-foot {
-    margin-top: 0.5rem;
+    display: flex;
+    align-items: center;
+    margin-top: 0.75rem;
     font-size: 0.75rem;
-    opacity: 0.7;
+    opacity: 0.65;
 }
 
-/* State is carried by a left edge rather than by the whole background, so the text keeps the
-   theme's own contrast instead of sitting on a colour we chose. */
+.flynn-sep::before {
+    content: "\00B7";
+    margin: 0 0.4rem;
+    opacity: 0.6;
+}
+
+/* State reads as a dot and a left edge rather than a filled background, so the text keeps the
+   theme's own contrast instead of sitting on a colour we picked. */
+.flynn-dot {
+    width: 0.5rem;
+    height: 0.5rem;
+    border-radius: 50%;
+    margin-right: 0.4rem;
+    background: currentColor;
+    opacity: 0.8;
+}
+
 .flynn-healthy {
     border-left: 3px solid var(--flynn-ok, #2aa198);
+}
+
+.flynn-healthy .flynn-dot {
+    background: var(--flynn-ok, #2aa198);
 }
 
 .flynn-degraded,
@@ -69,18 +131,87 @@
     border-left: 3px solid var(--flynn-warn, #d38c00);
 }
 
+.flynn-degraded .flynn-dot {
+    background: var(--flynn-warn, #d38c00);
+}
+
 .flynn-failed,
 .flynn-critical {
     border-left: 3px solid var(--flynn-bad, #c1443c);
 }
 
-.flynn-disabled {
-    border-left: 3px solid transparent;
-    opacity: 0.6;
+.flynn-failed .flynn-dot {
+    background: var(--flynn-bad, #c1443c);
 }
 
 .flynn-info {
     border-left: 3px solid var(--flynn-info, #4b7bd4);
+}
+
+.flynn-disabled {
+    border-left: 3px solid transparent;
+}
+
+.flynn-disabled .flynn-card-headline,
+.flynn-disabled .flynn-card-summary {
+    opacity: 0.45;
+}
+
+/* Switch. Built from a checkbox so it stays keyboard reachable and announces itself; a div with
+   a click handler would look identical and be unusable without a mouse. */
+.flynn-switch {
+    position: relative;
+    display: inline-block;
+    width: 2.6rem;
+    min-width: 2.6rem;
+    height: 1.45rem;
+    flex: none;
+}
+
+.flynn-switch input {
+    opacity: 0;
+    width: 100%;
+    height: 100%;
+    margin: 0;
+    cursor: pointer;
+}
+
+.flynn-slider {
+    position: absolute;
+    inset: 0;
+    border-radius: 1rem;
+    background: rgba(127, 127, 127, 0.4);
+    transition: background 0.15s ease;
+    pointer-events: none;
+}
+
+.flynn-slider::before {
+    content: "";
+    position: absolute;
+    height: 1.05rem;
+    width: 1.05rem;
+    left: 0.2rem;
+    bottom: 0.2rem;
+    border-radius: 50%;
+    background: #fff;
+    transition: transform 0.15s ease;
+}
+
+.flynn-switch input:checked + .flynn-slider {
+    background: var(--flynn-ok, #2aa198);
+}
+
+.flynn-switch input:checked + .flynn-slider::before {
+    transform: translateX(1.15rem);
+}
+
+.flynn-switch input:focus-visible + .flynn-slider {
+    outline: 2px solid var(--focus-color, #00a4dc);
+    outline-offset: 2px;
+}
+
+.flynn-switch input:disabled + .flynn-slider {
+    opacity: 0.5;
 }
 
 .flynn-issue {
@@ -91,8 +222,12 @@
     font-weight: 600;
 }
 
+.flynn-clear {
+    opacity: 0.7;
+}
+
 .flynn-withheld {
     margin-top: 0.75rem;
     font-size: 0.8rem;
-    opacity: 0.7;
+    opacity: 0.6;
 }
