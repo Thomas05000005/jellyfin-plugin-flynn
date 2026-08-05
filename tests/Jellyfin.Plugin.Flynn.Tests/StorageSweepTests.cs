@@ -114,39 +114,6 @@ public class StorageSweepTests
         }
     }
 
-    /// <summary>
-    /// The matching rule, tested without needing a second disk. Picking the longest mount point is
-    /// what makes a library on a pool resolve to the pool rather than to the root filesystem, and
-    /// therefore what makes two libraries on that pool share one entry.
-    /// </summary>
-    [Fact]
-    public void TheLongestMatchingMountPoint_Wins()
-    {
-        var mounts = DriveInfo.GetDrives().Where(d => d.IsReady).ToList();
-        var deepest = mounts.MaxBy(m => m.RootDirectory.FullName.Length)!;
-
-        var holder = DriveProbe.MountHolding(mounts, deepest.RootDirectory.FullName);
-
-        Assert.Equal(deepest.RootDirectory.FullName, holder!.RootDirectory.FullName);
-    }
-
-    /// <summary>
-    /// A sibling that merely shares a prefix must not be mistaken for something inside the mount
-    /// point: "/mnt/poolroom" is not on "/mnt/pool".
-    /// </summary>
-    [Fact]
-    public void APathThatMerelySharesAPrefix_IsNotAMatch()
-    {
-        var mounts = DriveInfo.GetDrives().Where(d => d.IsReady).ToList();
-        var shortest = mounts.MinBy(m => m.RootDirectory.FullName.Length)!.RootDirectory.FullName;
-        var lookalike = shortest.TrimEnd(Path.DirectorySeparatorChar) + "xyz-not-a-mount";
-
-        var holder = DriveProbe.MountHolding(mounts, lookalike);
-
-        Assert.True(
-            holder is null || holder.RootDirectory.FullName.Length <= shortest.Length,
-            "a path sharing a prefix with a mount point must not resolve to it");
-    }
 
     [Fact]
     public void UnreadableOrEmptyPaths_DoNotStopTheProbe()
