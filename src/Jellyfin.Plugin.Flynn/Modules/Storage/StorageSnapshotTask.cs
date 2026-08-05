@@ -1,4 +1,6 @@
 using Jellyfin.Plugin.Flynn.Core.Data;
+using Jellyfin.Plugin.Flynn.Core.Issues;
+using Jellyfin.Plugin.Flynn.Modules.Forecast;
 using MediaBrowser.Model.Tasks;
 using Microsoft.Extensions.Logging;
 
@@ -15,22 +17,30 @@ public sealed class StorageSnapshotTask : IScheduledTask, IConfigurableScheduled
 {
     private readonly StorageSweep _sweep;
     private readonly StorageRepository _repository;
+    private readonly ForecastModule _forecast;
+    private readonly IssueRegistry _issues;
     private readonly DatabaseReadiness _readiness;
     private readonly ILogger<StorageSnapshotTask> _logger;
 
     /// <summary>Initializes a new instance of the <see cref="StorageSnapshotTask"/> class.</summary>
     /// <param name="sweep">Does the measuring.</param>
     /// <param name="repository">Stores the result.</param>
+    /// <param name="forecast">Turns the history into issues.</param>
+    /// <param name="issues">The issue registry.</param>
     /// <param name="readiness">Whether storage is available.</param>
     /// <param name="logger">Logger.</param>
     public StorageSnapshotTask(
         StorageSweep sweep,
         StorageRepository repository,
+        ForecastModule forecast,
+        IssueRegistry issues,
         DatabaseReadiness readiness,
         ILogger<StorageSnapshotTask> logger)
     {
         _sweep = sweep;
         _repository = repository;
+        _forecast = forecast;
+        _issues = issues;
         _readiness = readiness;
         _logger = logger;
     }
@@ -85,5 +95,10 @@ public sealed class StorageSnapshotTask : IScheduledTask, IConfigurableScheduled
 
         var snapshot = await _sweep.RunAsync(progress, cancellationToken).ConfigureAwait(false);
         await _repository.SaveAsync(snapshot, cancellationToken).ConfigureAwait(false);
+
+        // Straight after storing tonight's reading, because the forecast is only as current as
+        // the last point it saw. Running it on its own schedule would mean the inbox lags the
+        // data it is drawn from by up to a day.
+        await _forecast.ReportIssuesAsync(_issues, cancellationToken).ConfigureAwait(false);
     }
 }

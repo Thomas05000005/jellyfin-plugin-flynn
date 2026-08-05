@@ -54,13 +54,14 @@ public sealed class StorageRepository
             await using var command = connection.CreateCommand();
             command.CommandText =
                 "INSERT OR REPLACE INTO storage_device_snapshot "
-                + "(taken_at, device_id, mount_path, total_bytes, free_bytes) "
-                + "VALUES ($at, $id, $path, $total, $free)";
+                + "(taken_at, device_id, mount_path, total_bytes, free_bytes, fs_type) "
+                + "VALUES ($at, $id, $path, $total, $free, $fs)";
             command.Parameters.AddWithValue("$at", takenAt);
             command.Parameters.AddWithValue("$id", device.DeviceId);
             command.Parameters.AddWithValue("$path", device.MountPath);
             command.Parameters.AddWithValue("$total", device.TotalBytes);
             command.Parameters.AddWithValue("$free", device.FreeBytes);
+            command.Parameters.AddWithValue("$fs", device.FileSystemType ?? string.Empty);
             await command.ExecuteNonQueryAsync(cancellationToken).ConfigureAwait(false);
         }
 
@@ -114,14 +115,15 @@ public sealed class StorageRepository
         await using (var read = connection.CreateCommand())
         {
             read.CommandText =
-                "SELECT device_id, mount_path, total_bytes, free_bytes FROM storage_device_snapshot "
-                + "WHERE taken_at = $at";
+                "SELECT device_id, mount_path, total_bytes, free_bytes, fs_type "
+                + "FROM storage_device_snapshot WHERE taken_at = $at";
             read.Parameters.AddWithValue("$at", takenAt);
             await using var rows = await read.ExecuteReaderAsync(cancellationToken).ConfigureAwait(false);
             while (await rows.ReadAsync(cancellationToken).ConfigureAwait(false))
             {
                 devices.Add(new DeviceSnapshot(
-                    rows.GetString(0), rows.GetString(1), rows.GetInt64(2), rows.GetInt64(3)));
+                    rows.GetString(0), rows.GetString(1), rows.GetInt64(2), rows.GetInt64(3),
+                    rows.IsDBNull(4) ? string.Empty : rows.GetString(4)));
             }
         }
 
@@ -129,5 +131,41 @@ public sealed class StorageRepository
             DateTimeOffset.Parse(takenAt, CultureInfo.InvariantCulture),
             libraries,
             devices);
+    }
+
+    /// <summary>
+    /// Returns one device's free-space history, oldest first.
+    /// <para>
+    /// One row per sweep, which is one per night. Even years of it is a few thousand rows, so this
+    /// is read whole rather than windowed: a forecast that silently ignores the older half of the
+    /// history would be answering a different question than the one asked.
+    /// </para>
+    /// </summary>
+    /// <param name="deviceId">The device's identity.</param>
+    /// <param name="cancellationToken">Cancellation token.</param>
+    /// <returns>Its readings.</returns>
+    public async Task<IReadOnlyList<CapacityReading>> GetHistoryAsync(
+        string deviceId,
+        CancellationToken cancellationToken)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(deviceId);
+
+        await using var connection = await _database.OpenAsync(cancellationToken).ConfigureAwait(false);
+        await using var read = connection.CreateCommand();
+        read.CommandText =
+            "SELECT taken_at, free_bytes FROM storage_device_snapshot "
+            + "WHERE device_id = $id ORDER BY taken_at";
+        read.Parameters.AddWithValue("$id", deviceId);
+
+        var readings = new List<CapacityReading>();
+        await using var rows = await read.ExecuteReaderAsync(cancellationToken).ConfigureAwait(false);
+        while (await rows.ReadAsync(cancellationToken).ConfigureAwait(false))
+        {
+            readings.Add(new CapacityReading(
+                DateTimeOffset.Parse(rows.GetString(0), CultureInfo.InvariantCulture),
+                rows.GetInt64(1)));
+        }
+
+        return readings;
     }
 }

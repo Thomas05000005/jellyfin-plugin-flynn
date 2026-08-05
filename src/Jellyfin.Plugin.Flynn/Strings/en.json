@@ -39,5 +39,15 @@
   "unit.megabytes": "MB",
   "unit.gigabytes": "GB",
   "unit.terabytes": "TB",
-  "unit.petabytes": "PB"
+  "unit.petabytes": "PB",
+  "forecast.name": "Capacity",
+  "forecast.summary": "When your disks run out of room.",
+  "forecast.collecting": "Collecting readings ({0} of {1}).",
+  "forecast.filling": "{0} full in {1} days",
+  "forecast.steady": "No disk is filling up.",
+  "forecast.inconclusive": "Usage too irregular to project.",
+  "forecast.rate": "{0} {1} a day on {2}",
+  "forecast.no-devices": "No devices measured yet.",
+  "issue.capacity.title": "{0} runs out of room in {1} days",
+  "issue.capacity.detail": "Measured over {0} nightly readings. Writable space excludes what the filesystem holds back."
 }

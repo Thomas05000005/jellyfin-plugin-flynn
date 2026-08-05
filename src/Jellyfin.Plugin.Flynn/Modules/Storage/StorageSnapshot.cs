@@ -15,7 +15,16 @@ public sealed record LibrarySnapshot(string LibraryId, string LibraryName, long 
 /// <param name="MountPath">Where it is mounted.</param>
 /// <param name="TotalBytes">Capacity.</param>
 /// <param name="FreeBytes">What is left.</param>
-public sealed record DeviceSnapshot(string DeviceId, string MountPath, long TotalBytes, long FreeBytes)
+/// <param name="FileSystemType">
+/// Needed by the forecast: ZFS holds back a reserve that ordinary writes cannot touch, so how much
+/// of the free space is actually usable depends on what kind of filesystem this is.
+/// </param>
+public sealed record DeviceSnapshot(
+    string DeviceId,
+    string MountPath,
+    long TotalBytes,
+    long FreeBytes,
+    string FileSystemType = "")
 {
     /// <summary>Gets how much of the device is in use, from 0 to 1.</summary>
     public double UsedFraction => TotalBytes <= 0 ? 0 : 1d - ((double)FreeBytes / TotalBytes);

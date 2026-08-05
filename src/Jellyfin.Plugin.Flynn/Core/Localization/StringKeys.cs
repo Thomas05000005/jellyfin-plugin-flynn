@@ -117,6 +117,27 @@ public static class StringKeys
     /// <summary>Size unit: petabytes.</summary>
     public const string UnitPetabytes = "unit.petabytes";
 
+    /// <summary>Capacity forecast: <c>forecast.name</c>.</summary>
+    public const string ForecastName = "forecast.name";
+    /// <summary>Capacity forecast: <c>forecast.summary</c>.</summary>
+    public const string ForecastSummary = "forecast.summary";
+    /// <summary>Capacity forecast: <c>forecast.collecting</c>.</summary>
+    public const string ForecastCollecting = "forecast.collecting";
+    /// <summary>Capacity forecast: <c>forecast.filling</c>.</summary>
+    public const string ForecastFilling = "forecast.filling";
+    /// <summary>Capacity forecast: <c>forecast.steady</c>.</summary>
+    public const string ForecastSteady = "forecast.steady";
+    /// <summary>Capacity forecast: <c>forecast.inconclusive</c>.</summary>
+    public const string ForecastInconclusive = "forecast.inconclusive";
+    /// <summary>Capacity forecast: <c>forecast.rate</c>.</summary>
+    public const string ForecastRate = "forecast.rate";
+    /// <summary>Capacity forecast: <c>forecast.no-devices</c>.</summary>
+    public const string ForecastNoDevices = "forecast.no-devices";
+    /// <summary>Capacity forecast: <c>issue.capacity.title</c>.</summary>
+    public const string IssueCapacityTitle = "issue.capacity.title";
+    /// <summary>Capacity forecast: <c>issue.capacity.detail</c>.</summary>
+    public const string IssueCapacityDetail = "issue.capacity.detail";
+
     /// <summary>Gets every key defined above, for catalogue completeness checks.</summary>
     public static IReadOnlyList<string> All { get; } =
     [
@@ -161,5 +182,15 @@ public static class StringKeys
         UnitGigabytes,
         UnitTerabytes,
         UnitPetabytes,
+        ForecastName,
+        ForecastSummary,
+        ForecastCollecting,
+        ForecastFilling,
+        ForecastSteady,
+        ForecastInconclusive,
+        ForecastRate,
+        ForecastNoDevices,
+        IssueCapacityTitle,
+        IssueCapacityDetail,
     ];
 }

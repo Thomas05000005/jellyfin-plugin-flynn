@@ -39,5 +39,15 @@
   "ui.cat.system": "Système",
   "ui.cat.library": "Bibliothèque",
   "ui.cat.music": "Musique",
-  "ui.cat.people": "Utilisateurs"
+  "ui.cat.people": "Utilisateurs",
+  "forecast.name": "Capacite",
+  "forecast.summary": "Quand vos disques n'auront plus de place.",
+  "forecast.collecting": "Releves en cours ({0} sur {1}).",
+  "forecast.filling": "{0} plein dans {1} jours",
+  "forecast.steady": "Aucun disque ne se remplit.",
+  "forecast.inconclusive": "Usage trop irregulier pour projeter.",
+  "forecast.rate": "{0} {1} par jour sur {2}",
+  "forecast.no-devices": "Aucun disque mesure pour l'instant.",
+  "issue.capacity.title": "{0} n'aura plus de place dans {1} jours",
+  "issue.capacity.detail": "Mesure sur {0} releves nocturnes. L'espace ecrivable exclut ce que le systeme de fichiers reserve."
 }

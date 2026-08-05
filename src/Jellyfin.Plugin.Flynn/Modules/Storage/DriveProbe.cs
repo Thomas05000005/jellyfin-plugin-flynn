@@ -105,7 +105,8 @@ public sealed class DriveProbe : IDriveProbe
                     key,
                     FilesystemIdentity.DisplayNameOf(mount),
                     info.TotalSize,
-                    info.AvailableFreeSpace);
+                    info.AvailableFreeSpace,
+                    mount.FileSystemType);
             }
 #pragma warning disable CA1031 // One unreadable device must not lose the whole sweep.
             catch (Exception ex)
@@ -157,7 +158,8 @@ public sealed class DriveProbe : IDriveProbe
             var root = drive.RootDirectory.FullName;
             if (!byRoot.ContainsKey(root))
             {
-                byRoot[root] = new DeviceSnapshot(root, root, drive.TotalSize, drive.AvailableFreeSpace);
+                byRoot[root] = new DeviceSnapshot(
+                    root, root, drive.TotalSize, drive.AvailableFreeSpace, drive.DriveFormat);
             }
         }
 

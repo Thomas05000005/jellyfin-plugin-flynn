@@ -85,5 +85,12 @@ public static class Migrations
 
             CREATE INDEX ix_mutation_log_recent ON mutation_log (prepared_at DESC);
             """),
+
+        new Migration(
+            4,
+            "device filesystem type",
+            """
+            ALTER TABLE storage_device_snapshot ADD COLUMN fs_type TEXT NOT NULL DEFAULT '';
+            """),
     ];
 }
