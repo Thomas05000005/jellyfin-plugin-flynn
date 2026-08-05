@@ -5,6 +5,7 @@ using Jellyfin.Plugin.Flynn.Core.Modules;
 using Jellyfin.Plugin.Flynn.Core.Mutations;
 using Jellyfin.Plugin.Flynn.Core.Web;
 using Jellyfin.Plugin.Flynn.Modules.Forecast;
+using Jellyfin.Plugin.Flynn.Modules.Resources;
 using Jellyfin.Plugin.Flynn.Modules.Storage;
 using Microsoft.AspNetCore.Hosting;
 using MediaBrowser.Common.Configuration;
@@ -67,6 +68,8 @@ public sealed class PluginServiceRegistrator : IPluginServiceRegistrator
         serviceCollection.AddSingleton<IScheduledTask, StorageSnapshotTask>();
         serviceCollection.AddSingleton<IFlynnModule, ForecastModule>();
         serviceCollection.AddSingleton<ForecastModule>();
+        serviceCollection.AddSingleton<CgroupReader>();
+        serviceCollection.AddSingleton<IFlynnModule, ResourcesModule>();
 
         // An IStartupFilter is all it takes for ASP.NET Core to wrap the pipeline; the
         // server needs no knowledge of us.

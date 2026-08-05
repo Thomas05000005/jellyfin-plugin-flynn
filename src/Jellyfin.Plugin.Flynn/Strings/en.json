@@ -49,5 +49,13 @@
   "forecast.rate": "{0} {1} a day on {2}",
   "forecast.no-devices": "No devices measured yet.",
   "issue.capacity.title": "{0} runs out of room in {1} days",
-  "issue.capacity.detail": "Measured over {0} nightly readings. Writable space excludes what the filesystem holds back."
+  "issue.capacity.detail": "Measured over {0} nightly readings. Writable space excludes what the filesystem holds back.",
+  "resources.name": "Resources",
+  "resources.summary": "What Jellyfin costs, transcodes included.",
+  "resources.headline": "{0}% CPU, {1} {2} in use",
+  "resources.of-cores": "of {0} cores",
+  "resources.of-quota": "of a {0} core limit",
+  "resources.measuring": "Measuring. A rate needs two readings.",
+  "resources.unavailable": "Control group counters are unavailable. This needs cgroup v2 on Linux.",
+  "resources.cache-note": "{0} {1} more is reclaimable page cache."
 }

@@ -138,6 +138,23 @@ public static class StringKeys
     /// <summary>Capacity forecast: <c>issue.capacity.detail</c>.</summary>
     public const string IssueCapacityDetail = "issue.capacity.detail";
 
+    /// <summary>Resources module: <c>resources.name</c>.</summary>
+    public const string ResourcesName = "resources.name";
+    /// <summary>Resources module: <c>resources.summary</c>.</summary>
+    public const string ResourcesSummary = "resources.summary";
+    /// <summary>Resources module: <c>resources.headline</c>.</summary>
+    public const string ResourcesHeadline = "resources.headline";
+    /// <summary>Resources module: <c>resources.of-cores</c>.</summary>
+    public const string ResourcesOfCores = "resources.of-cores";
+    /// <summary>Resources module: <c>resources.of-quota</c>.</summary>
+    public const string ResourcesOfQuota = "resources.of-quota";
+    /// <summary>Resources module: <c>resources.measuring</c>.</summary>
+    public const string ResourcesMeasuring = "resources.measuring";
+    /// <summary>Resources module: <c>resources.unavailable</c>.</summary>
+    public const string ResourcesUnavailable = "resources.unavailable";
+    /// <summary>Resources module: <c>resources.cache-note</c>.</summary>
+    public const string ResourcesCacheNote = "resources.cache-note";
+
     /// <summary>Gets every key defined above, for catalogue completeness checks.</summary>
     public static IReadOnlyList<string> All { get; } =
     [
@@ -192,5 +209,13 @@ public static class StringKeys
         ForecastNoDevices,
         IssueCapacityTitle,
         IssueCapacityDetail,
+        ResourcesName,
+        ResourcesSummary,
+        ResourcesHeadline,
+        ResourcesOfCores,
+        ResourcesOfQuota,
+        ResourcesMeasuring,
+        ResourcesUnavailable,
+        ResourcesCacheNote,
     ];
 }

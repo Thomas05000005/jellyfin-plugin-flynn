@@ -49,5 +49,13 @@
   "forecast.rate": "{0} {1} par jour sur {2}",
   "forecast.no-devices": "Aucun disque mesure pour l'instant.",
   "issue.capacity.title": "{0} n'aura plus de place dans {1} jours",
-  "issue.capacity.detail": "Mesure sur {0} releves nocturnes. L'espace ecrivable exclut ce que le systeme de fichiers reserve."
+  "issue.capacity.detail": "Mesure sur {0} releves nocturnes. L'espace ecrivable exclut ce que le systeme de fichiers reserve.",
+  "resources.name": "Ressources",
+  "resources.summary": "Ce que coute Jellyfin, transcodages compris.",
+  "resources.headline": "{0} % CPU, {1} {2} utilises",
+  "resources.of-cores": "sur {0} coeurs",
+  "resources.of-quota": "sur une limite de {0} coeurs",
+  "resources.measuring": "Mesure en cours. Un taux demande deux releves.",
+  "resources.unavailable": "Les compteurs cgroup sont indisponibles. Il faut cgroup v2 sous Linux.",
+  "resources.cache-note": "{0} {1} de plus sont du cache recuperable."
 }
