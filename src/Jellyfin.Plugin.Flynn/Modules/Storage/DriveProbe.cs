@@ -80,10 +80,12 @@ public sealed class DriveProbe : IDriveProbe
                 continue;
             }
 
-            // Keyed by major:minor, not by mount point. Six bind mounts of one pool collapse to one
-            // entry here; keying on the path would keep all six and count the pool's free space
-            // six times over.
-            if (byDevice.ContainsKey(mount.DeviceId))
+            // Keyed by what actually shares the free space, which is the pool on ZFS and the
+            // device id everywhere else. Keying on the mount point keeps six bind mounts of one
+            // pool as six devices; keying on the device id alone holds until someone splits a
+            // library into its own dataset, since ZFS gives every dataset its own superblock.
+            var key = FilesystemIdentity.Of(mount);
+            if (byDevice.ContainsKey(key))
             {
                 continue;
             }
@@ -96,12 +98,12 @@ public sealed class DriveProbe : IDriveProbe
                     continue;
                 }
 
-                // The source name is what the admin called it -- "RAID-Z1" -- while the mount
-                // point is whatever the container was told to call it. Reporting the pool as
+                // The pool name is what the admin called it -- "RAID-Z1" -- while the mount point
+                // is whatever the container was told to call it. Reporting the pool as
                 // "/data/Films" reads as though that one folder were full.
-                byDevice[mount.DeviceId] = new DeviceSnapshot(
-                    mount.DeviceId,
-                    string.IsNullOrWhiteSpace(mount.Source) ? mount.MountPoint : mount.Source,
+                byDevice[key] = new DeviceSnapshot(
+                    key,
+                    FilesystemIdentity.DisplayNameOf(mount),
                     info.TotalSize,
                     info.AvailableFreeSpace);
             }
