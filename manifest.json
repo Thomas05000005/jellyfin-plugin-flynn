@@ -13,8 +13,8 @@
                 "changelog": "Adds Capacity: when your disks run out of room, and an entry in the inbox when that gets close. It says nothing for the first two weeks after install, because a date drawn from three nightly readings is a guess wearing a number. It uses a median of daily change rather than a line fit, so one overnight import of half a terabyte does not move the answer. On ZFS it extrapolates towards the reserve the pool holds back rather than towards zero. Alerts need both a near date and a disk already fairly full, so a mostly empty disk filling quickly stays quiet. Requires Jellyfin 12.0 or later.",
                 "targetAbi": "12.0.0.0",
                 "sourceUrl": "https://github.com/Thomas05000005/jellyfin-plugin-flynn/releases/download/v0.4.0/Flynn-v0.4.0.zip",
-                "checksum": "PLACEHOLDER_RECOMPUTE_AFTER_BUILD",
-                "timestamp": "2026-08-05T00:00:00.0000000Z"
+                "checksum": "11429fd730327532460d9e0eea065b14",
+                "timestamp": "2026-08-05T20:25:50.0000000Z"
             },
             {
                 "version": "0.3.1.0",
