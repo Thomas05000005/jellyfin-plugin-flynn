@@ -149,6 +149,42 @@ public sealed class IssueRegistry
     }
 
     /// <summary>
+    /// Lists the issues being deliberately withheld, so a hide can be undone.
+    /// <para>
+    /// Dismissal is permanent and a count alone is not a way back: knowing that three issues are
+    /// hidden, without being able to see which three, is only a slightly better blind spot. A
+    /// snooze that has already run out is not listed here, because it is open again.
+    /// </para>
+    /// <para>
+    /// Resolved issues are excluded. Nobody hid those -- they closed themselves, and putting them
+    /// in a list of things to reconsider would bury the two that were actually a decision.
+    /// </para>
+    /// </summary>
+    /// <param name="cancellationToken">Cancellation token.</param>
+    /// <returns>The dismissed and still-snoozed issues, worst first.</returns>
+    public async Task<IReadOnlyList<TrackedIssue>> GetWithheldAsync(CancellationToken cancellationToken)
+    {
+        var now = _clock.GetUtcNow();
+        await using var connection = await _database.OpenAsync(cancellationToken).ConfigureAwait(false);
+        await using var read = connection.CreateCommand();
+        read.CommandText =
+            "SELECT * FROM issue WHERE state = $dismissed OR (state = $snoozed AND snoozed_until > $now) "
+            + "ORDER BY severity DESC, last_seen DESC";
+        read.Parameters.AddWithValue("$dismissed", (int)IssueState.Dismissed);
+        read.Parameters.AddWithValue("$snoozed", (int)IssueState.Snoozed);
+        read.Parameters.AddWithValue("$now", now.ToString("O", CultureInfo.InvariantCulture));
+
+        var results = new List<TrackedIssue>();
+        await using var rows = await read.ExecuteReaderAsync(cancellationToken).ConfigureAwait(false);
+        while (await rows.ReadAsync(cancellationToken).ConfigureAwait(false))
+        {
+            results.Add(Read(rows));
+        }
+
+        return results;
+    }
+
+    /// <summary>
     /// Counts issues by state, so the inbox can show what it is not showing.
     /// <para>
     /// The dismissed count is the point: dismissal is permanent, and a permanent hide with no

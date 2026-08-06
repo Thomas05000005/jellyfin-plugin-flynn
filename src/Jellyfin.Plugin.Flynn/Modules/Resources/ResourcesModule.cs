@@ -80,12 +80,20 @@ public sealed class ResourcesModule : IFlynnModule
         var memory = StorageModule.ScaleBytes(usage.MemoryInUseBytes);
         var cache = StorageModule.ScaleBytes(usage.MemoryChargedBytes - usage.MemoryInUseBytes);
 
+        // Say what the percentage is a share of. Eighty percent of an imposed quota means
+        // throttling is about to start; eighty percent of the whole machine means busy. The same
+        // number carries the two meanings, so the card has to name which one it is.
+        var ceiling = LocalizedText.Of(
+            usage.CpuCeilingIsQuota ? StringKeys.ResourcesOfQuota : StringKeys.ResourcesOfCores,
+            Math.Round(usage.CpuCeilingCores, 2));
+
         return new ModuleCard(
             Id,
             usage.CpuPercent >= 90 || usage.ThrottledFraction >= 0.1 ? ModuleState.Degraded : ModuleState.Healthy,
             LocalizedText.Of(
                 StringKeys.ResourcesHeadline,
                 (int)Math.Round(usage.CpuPercent.Value),
+                ceiling,
                 memory.Value,
                 LocalizedText.Of(memory.UnitKey)),
             LocalizedText.Of(StringKeys.ResourcesCacheNote, cache.Value, LocalizedText.Of(cache.UnitKey)),

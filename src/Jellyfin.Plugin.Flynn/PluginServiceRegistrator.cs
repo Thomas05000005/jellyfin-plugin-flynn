@@ -56,6 +56,7 @@ public sealed class PluginServiceRegistrator : IPluginServiceRegistrator
         serviceCollection.AddSingleton<ConfigStore>();
 
         serviceCollection.AddSingleton<IssueRegistry>();
+        serviceCollection.AddSingleton<Retention>();
         serviceCollection.AddSingleton<MutationKernel>();
         serviceCollection.AddSingleton<ModuleRegistry>();
 
@@ -66,8 +67,13 @@ public sealed class PluginServiceRegistrator : IPluginServiceRegistrator
         serviceCollection.AddSingleton<IDriveProbe, DriveProbe>();
         serviceCollection.AddSingleton<StorageSweep>();
         serviceCollection.AddSingleton<IScheduledTask, StorageSnapshotTask>();
-        serviceCollection.AddSingleton<IFlynnModule, ForecastModule>();
+        // Registered once as the concrete type, then handed to the IFlynnModule collection as the
+        // SAME instance. Two AddSingleton calls look equivalent and are not: they build two
+        // objects, so the registry renders one and the scheduled task drives the other. Harmless
+        // only for as long as the module stays stateless, which is not a property anyone would
+        // think to preserve.
         serviceCollection.AddSingleton<ForecastModule>();
+        serviceCollection.AddSingleton<IFlynnModule>(s => s.GetRequiredService<ForecastModule>());
         serviceCollection.AddSingleton<CgroupReader>();
         serviceCollection.AddSingleton<IFlynnModule, ResourcesModule>();
 

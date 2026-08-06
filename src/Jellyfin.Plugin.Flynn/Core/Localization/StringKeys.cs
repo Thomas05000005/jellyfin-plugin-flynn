@@ -81,6 +81,22 @@ public static class StringKeys
     public const string UiWithheldResolved = "ui.withheld.resolved";
     /// <summary>Admin page chrome: <c>ui.toggle-failed</c>.</summary>
     public const string UiToggleFailed = "ui.toggle-failed";
+    /// <summary>Issue state, for a row that is not in the inbox: <c>ui.state.snoozed</c>.</summary>
+    public const string UiStateSnoozed = "ui.state.snoozed";
+    /// <summary>Issue state, for a row that is not in the inbox: <c>ui.state.dismissed</c>.</summary>
+    public const string UiStateDismissed = "ui.state.dismissed";
+    /// <summary>Inbox action: <c>ui.dismiss</c>.</summary>
+    public const string UiDismiss = "ui.dismiss";
+    /// <summary>Inbox action: <c>ui.snooze-7</c>.</summary>
+    public const string UiSnooze7 = "ui.snooze-7";
+    /// <summary>Inbox action: <c>ui.restore</c>.</summary>
+    public const string UiRestore = "ui.restore";
+    /// <summary>Asked before a permanent hide: <c>ui.dismiss-confirm</c>.</summary>
+    public const string UiDismissConfirm = "ui.dismiss-confirm";
+    /// <summary>Admin page chrome: <c>ui.issue-action-failed</c>.</summary>
+    public const string UiIssueActionFailed = "ui.issue-action-failed";
+    /// <summary>Shown when everything withheld closed itself: <c>ui.withheld-resolved-only</c>.</summary>
+    public const string UiWithheldResolvedOnly = "ui.withheld-resolved-only";
 
     /// <summary>Dashboard category heading: <c>ui.cat.operations</c>.</summary>
     public const string UiCatOperations = "ui.cat.operations";
@@ -186,6 +202,14 @@ public static class StringKeys
         UiWithheldSnoozed,
         UiWithheldResolved,
         UiToggleFailed,
+        UiStateSnoozed,
+        UiStateDismissed,
+        UiDismiss,
+        UiSnooze7,
+        UiRestore,
+        UiDismissConfirm,
+        UiIssueActionFailed,
+        UiWithheldResolvedOnly,
         UiCatOperations,
         UiCatSystem,
         UiCatLibrary,

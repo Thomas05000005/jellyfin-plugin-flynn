@@ -19,6 +19,7 @@ public sealed class StorageSnapshotTask : IScheduledTask, IConfigurableScheduled
     private readonly StorageRepository _repository;
     private readonly ForecastModule _forecast;
     private readonly IssueRegistry _issues;
+    private readonly Retention _retention;
     private readonly DatabaseReadiness _readiness;
     private readonly ILogger<StorageSnapshotTask> _logger;
 
@@ -27,6 +28,7 @@ public sealed class StorageSnapshotTask : IScheduledTask, IConfigurableScheduled
     /// <param name="repository">Stores the result.</param>
     /// <param name="forecast">Turns the history into issues.</param>
     /// <param name="issues">The issue registry.</param>
+    /// <param name="retention">Prunes what grows without bound.</param>
     /// <param name="readiness">Whether storage is available.</param>
     /// <param name="logger">Logger.</param>
     public StorageSnapshotTask(
@@ -34,6 +36,7 @@ public sealed class StorageSnapshotTask : IScheduledTask, IConfigurableScheduled
         StorageRepository repository,
         ForecastModule forecast,
         IssueRegistry issues,
+        Retention retention,
         DatabaseReadiness readiness,
         ILogger<StorageSnapshotTask> logger)
     {
@@ -41,6 +44,7 @@ public sealed class StorageSnapshotTask : IScheduledTask, IConfigurableScheduled
         _repository = repository;
         _forecast = forecast;
         _issues = issues;
+        _retention = retention;
         _readiness = readiness;
         _logger = logger;
     }
@@ -100,5 +104,9 @@ public sealed class StorageSnapshotTask : IScheduledTask, IConfigurableScheduled
         // the last point it saw. Running it on its own schedule would mean the inbox lags the
         // data it is drawn from by up to a day.
         await _forecast.ReportIssuesAsync(_issues, cancellationToken).ConfigureAwait(false);
+
+        // Last, and after the sweep has already had its say. Pruning first could delete a
+        // resolved issue in the same pass that was about to reopen it.
+        await _retention.RunAsync(cancellationToken).ConfigureAwait(false);
     }
 }

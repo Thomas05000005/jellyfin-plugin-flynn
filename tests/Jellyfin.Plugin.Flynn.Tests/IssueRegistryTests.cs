@@ -255,12 +255,4 @@ public sealed class IssueRegistryTests : IAsyncLifetime
     private Task Sweep(params Issue[] found) =>
         _registry.ReconcileAsync(Module, Kind, found, CancellationToken.None);
 
-    private sealed class FakeClock(DateTimeOffset now) : TimeProvider
-    {
-        private DateTimeOffset _now = now;
-
-        public override DateTimeOffset GetUtcNow() => _now;
-
-        public void Advance(TimeSpan by) => _now = _now.Add(by);
-    }
 }

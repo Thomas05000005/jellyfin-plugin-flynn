@@ -308,7 +308,42 @@
 .flynn-withheld {
     margin-top: 0.8rem;
     font-size: 0.78rem;
-    opacity: 0.55;
+}
+
+/* The summary is the only route back to a permanently hidden issue, so it has to look like
+   something you can press. At 0.55 it read as a caption and nobody would ever have clicked it. */
+.flynn-withheld > summary {
+    cursor: pointer;
+    padding: 0.35rem 0;
+    opacity: 0.65;
+}
+
+.flynn-withheld > summary:hover,
+.flynn-withheld > summary:focus-visible {
+    opacity: 1;
+}
+
+.flynn-withheld[open] > summary {
+    margin-bottom: 0.55rem;
+    opacity: 0.85;
+}
+
+.flynn-issue-acts {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.45rem;
+    margin-top: 0.75rem;
+}
+
+.flynn-issue-act {
+    /* 24px floor for WCAG 2.5.8; the buttons sit close together and one of them is permanent. */
+    min-height: 2rem;
+    padding: 0 0.85rem;
+    font-size: 0.78rem;
+}
+
+.flynn-issue-act[disabled] {
+    opacity: 0.45;
 }
 
 /* Respect a system preference for less motion; the lift on hover is decoration, not information. */

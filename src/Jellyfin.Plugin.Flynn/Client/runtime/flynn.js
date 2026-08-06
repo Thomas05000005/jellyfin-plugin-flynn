@@ -18,11 +18,21 @@
     }
     window.__flynnLoaded = true;
 
-    var VERSION = '0.1.0';
+    /*
+     * Read from our own script tag rather than written here as a constant. The injected tag already
+     * carries ?v=<assembly version> to bust the browser cache, so taking it from there cannot go
+     * stale -- which the constant that used to sit here promptly did, claiming 0.1.0 for five
+     * releases. A version reported by hand is a version that is eventually wrong.
+     */
+    function version() {
+        var tag = document.getElementById('flynn-client');
+        var match = tag && /[?&]v=([^&]+)/.exec(tag.getAttribute('src') || '');
+        return match ? decodeURIComponent(match[1]) : 'unknown';
+    }
 
     // Nothing is drawn yet: no module ships a client surface at this point. The runtime exists so
     // that delivery is proven end to end before anything depends on it.
     if (window.console && window.console.debug) {
-        window.console.debug('[Flynn] client runtime ' + VERSION + ' loaded');
+        window.console.debug('[Flynn] client runtime ' + version() + ' loaded');
     }
 })();

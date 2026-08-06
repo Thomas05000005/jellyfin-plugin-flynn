@@ -100,19 +100,22 @@ public sealed class DashboardController : ControllerBase
 
         var strings = FlynnStrings.ForCulture(RequestCulture.For(Request));
         var open = await _issues.GetOpenAsync(cancellationToken).ConfigureAwait(false);
+        var withheld = await _issues.GetWithheldAsync(cancellationToken).ConfigureAwait(false);
         var counts = await _issues.CountByStateAsync(cancellationToken).ConfigureAwait(false);
 
-        var dtos = open.Select(tracked => new IssueDto(
+        IssueDto ToDto(TrackedIssue tracked) => new(
             tracked.Issue.Fingerprint,
             tracked.Issue.ModuleId,
             tracked.Issue.Severity.ToString(),
             tracked.Issue.Title.Resolve(strings),
             tracked.Issue.Detail?.Resolve(strings),
             tracked.FirstSeen,
-            tracked.LastSeen)).ToList();
+            tracked.LastSeen,
+            tracked.State.ToString());
 
         return new InboxDto(
-            dtos,
+            open.Select(ToDto).ToList(),
+            withheld.Select(ToDto).ToList(),
             counts.GetValueOrDefault(IssueState.Dismissed),
             counts.GetValueOrDefault(IssueState.Snoozed),
             counts.GetValueOrDefault(IssueState.Resolved));
@@ -146,7 +149,7 @@ public sealed class DashboardController : ControllerBase
     /// <param name="moduleId">The module's id.</param>
     /// <param name="enabled">Whether it should run.</param>
     /// <param name="cancellationToken">Cancellation token.</param>
-    /// <returns>No content, or 404 for an unknown module.</returns>
+    /// <returns>No content, 404 for an unknown module, or 400 when the write was refused.</returns>
     [HttpPost("modules/{moduleId}/enabled")]
     public async Task<ActionResult> SetModuleEnabled(
         string moduleId,
@@ -158,42 +161,62 @@ public sealed class DashboardController : ControllerBase
             return NotFound();
         }
 
-        await _config.MutateAsync(
-            config =>
-            {
-                var toggle = config.Modules.FirstOrDefault(m => m.Id == moduleId);
-                if (toggle is null)
+        try
+        {
+            await _config.MutateAsync(
+                config =>
                 {
-                    config.Modules.Add(new ModuleToggle { Id = moduleId, Enabled = enabled });
-                }
-                else
-                {
-                    toggle.Enabled = enabled;
-                }
-            },
-            cancellationToken).ConfigureAwait(false);
+                    var toggle = config.Modules.FirstOrDefault(m => m.Id == moduleId);
+                    if (toggle is null)
+                    {
+                        config.Modules.Add(new ModuleToggle { Id = moduleId, Enabled = enabled });
+                    }
+                    else
+                    {
+                        toggle.Enabled = enabled;
+                    }
+                },
+                cancellationToken).ConfigureAwait(false);
+        }
+        catch (ConfigurationRejectedException rejected)
+        {
+            // The store rehearsed the write and found the result would not survive a round trip.
+            // That is the caller being told no, not the server falling over, and a 500 would send
+            // the page down the "unreachable" path instead of showing the reason.
+            return BadRequest(new ProblemDetails { Title = rejected.Message });
+        }
 
         return NoContent();
     }
 
-    /// <summary>Stops an issue from ever coming back on its own.</summary>
+    /// <summary>
+    /// Stops an issue from ever coming back on its own.
+    /// <para>
+    /// The fingerprint travels in the query string, never in the path. It is built as
+    /// <c>module/kind/subject</c> and the subject is whatever the module names -- a device id like
+    /// <c>zfs:RAID-Z1</c>, an album, a path. Those contain slashes, so a <c>{fingerprint}</c> route
+    /// segment cannot match one, and percent-encoding does not save it either.
+    /// </para>
+    /// </summary>
     /// <param name="fingerprint">The issue's identity.</param>
     /// <param name="cancellationToken">Cancellation token.</param>
     /// <returns>No content, or 404 when the fingerprint is unknown.</returns>
-    [HttpPost("issues/{fingerprint}/dismiss")]
-    public async Task<ActionResult> DismissIssue(string fingerprint, CancellationToken cancellationToken) =>
+    [HttpPost("issues/dismiss")]
+    public async Task<ActionResult> DismissIssue(
+        [FromQuery] string fingerprint,
+        CancellationToken cancellationToken) =>
         await _issues.DismissAsync(fingerprint, cancellationToken).ConfigureAwait(false)
             ? NoContent()
             : NotFound();
 
     /// <summary>Hides an issue for a while.</summary>
-    /// <param name="fingerprint">The issue's identity.</param>
+    /// <param name="fingerprint">The issue's identity. In the query string, see DismissIssue.</param>
     /// <param name="days">How many days to hide it for.</param>
     /// <param name="cancellationToken">Cancellation token.</param>
     /// <returns>No content, or 404 when the fingerprint is unknown.</returns>
-    [HttpPost("issues/{fingerprint}/snooze")]
+    [HttpPost("issues/snooze")]
     public async Task<ActionResult> SnoozeIssue(
-        string fingerprint,
+        [FromQuery] string fingerprint,
         [FromQuery] int days,
         CancellationToken cancellationToken)
     {
@@ -209,11 +232,13 @@ public sealed class DashboardController : ControllerBase
     }
 
     /// <summary>Brings a dismissed or snoozed issue back.</summary>
-    /// <param name="fingerprint">The issue's identity.</param>
+    /// <param name="fingerprint">The issue's identity. In the query string, see DismissIssue.</param>
     /// <param name="cancellationToken">Cancellation token.</param>
     /// <returns>No content, or 404 when the fingerprint is unknown.</returns>
-    [HttpPost("issues/{fingerprint}/restore")]
-    public async Task<ActionResult> RestoreIssue(string fingerprint, CancellationToken cancellationToken) =>
+    [HttpPost("issues/restore")]
+    public async Task<ActionResult> RestoreIssue(
+        [FromQuery] string fingerprint,
+        CancellationToken cancellationToken) =>
         await _issues.RestoreAsync(fingerprint, cancellationToken).ConfigureAwait(false)
             ? NoContent()
             : NotFound();
@@ -251,23 +276,33 @@ public sealed record ModuleCardDto(
 
 /// <summary>The issue inbox.</summary>
 /// <param name="Open">Issues asking for attention, worst first.</param>
+/// <param name="Withheld">
+/// The dismissed and still-snoozed ones. Sent so a hide can be undone: a count on its own tells
+/// the admin that something is hidden without letting them find out what, which is only a slightly
+/// better blind spot than hiding it silently.
+/// </param>
 /// <param name="Dismissed">How many the admin chose never to see again.</param>
 /// <param name="Snoozed">How many are hidden until a date.</param>
 /// <param name="Resolved">How many closed themselves.</param>
 public sealed record InboxDto(
     IReadOnlyList<IssueDto> Open,
+    IReadOnlyList<IssueDto> Withheld,
     int Dismissed,
     int Snoozed,
     int Resolved);
 
 /// <summary>One issue, with its text already in the reader's language.</summary>
-/// <param name="Fingerprint">Stable identity, used by the dismiss and snooze endpoints.</param>
+/// <param name="Fingerprint">
+/// Stable identity, passed to the dismiss, snooze and restore endpoints in the query string. It
+/// contains slashes, so it can never be a route segment.
+/// </param>
 /// <param name="ModuleId">Which module found it.</param>
 /// <param name="Severity">Info, Warning or Critical.</param>
 /// <param name="Title">One line.</param>
 /// <param name="Detail">Longer explanation, if any.</param>
 /// <param name="FirstSeen">When it was first detected.</param>
 /// <param name="LastSeen">When it was last detected.</param>
+/// <param name="State">Open, Snoozed or Dismissed, so the page can say why it is not in the inbox.</param>
 public sealed record IssueDto(
     string Fingerprint,
     string ModuleId,
@@ -275,4 +310,5 @@ public sealed record IssueDto(
     string Title,
     string? Detail,
     DateTimeOffset FirstSeen,
-    DateTimeOffset LastSeen);
+    DateTimeOffset LastSeen,
+    string State);

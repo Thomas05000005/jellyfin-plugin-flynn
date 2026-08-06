@@ -51,6 +51,21 @@ read-only; writing is opt-in per operation.
 case: rewriting ID3/Vorbis tags changes the audio file's bytes and silently kills torrent seeding
 even though nothing moved.
 
+### An issue fingerprint is never a route segment
+
+It is `module/kind/subject`, and the subject is whatever the module names — a device identity like
+`zfs:RAID-Z1`, an album, a path. Those carry slashes, so a `{fingerprint}` route template cannot
+match one and percent-encoding does not rescue it: the path is decoded before routing sees it.
+Fingerprints travel in the query string. A test asserts no route template on `DashboardController`
+mentions one.
+
+### Retention keeps more than it deletes
+
+Storage readings are kept **forever** — about a hundred kilobytes a year, and the forecast caps its
+horizon at twice the history it can see, so pruning them shortens how far ahead Flynn will predict.
+Dismissed issues are kept forever too: the count is what stops a permanent hide being a blind spot.
+Only resolved issues and applied mutation records age out.
+
 ### Where data lives
 
 | Kind | Home |
@@ -77,11 +92,18 @@ must always hold needs a CI check or a `.claude/hooks/` entry, not a sentence he
 
 ## Status
 
-The socle is complete and wired into the server's container: `Core/Modules`, `Core/Config`,
-`Core/Data`, `Core/Localization`, `Core/Issues`, `Core/Mutations`. No module exists yet, so the
-plugin loads and does nothing visible.
+Socle complete and wired: `Core/Modules`, `Core/Config`, `Core/Data`, `Core/Localization`,
+`Core/Issues`, `Core/Mutations`, `Core/Web`.
 
-Next: script injection, the admin page rendered from the module registry, then Storage as the
-first real module.
+Three modules ship, all under System: **Storage**, **Capacity**, **Resources**. The issue inbox is
+usable — dismiss, snooze, restore, with the withheld ones listed so a permanent hide can be undone.
 
-Design, decisions and the porting plan: `docs/ARCHITECTURE.md`.
+`Core/Mutations` is built and tested but **inert**: no `IMutation` exists in `src/`, nothing
+resolves `MutationKernel`, and `MaxWriteLevel` is read by nothing. Nothing writes, so the invariant
+below currently holds trivially. Wiring it is the step before the Music module, which is the first
+thing that will write.
+
+Next: the write kernel, then Music (album duplicates, split multi-disc, ReplayGain audit) read-only
+first.
+
+Design and decisions: `docs/ARCHITECTURE.md`. Releasing: `docs/RELEASING.md`.

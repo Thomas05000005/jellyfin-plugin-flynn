@@ -141,6 +141,67 @@
         });
     }
 
+    /*
+     * The fingerprint goes in the query string, never in the path. It is built as
+     * module/kind/subject and the subject is whatever the module names -- a device id like
+     * zfs:RAID-Z1, an album, a path -- so it contains slashes that no single route segment can
+     * carry.
+     */
+    function issueAction(page, fingerprint, action, query) {
+        var url = API + '/issues/' + action + '?fingerprint=' + encodeURIComponent(fingerprint) +
+            (query || '');
+        return call(url, 'POST').then(function () {
+            loadIssues(page);
+        }, function () {
+            window.Dashboard && window.Dashboard.alert(t('ui.issue-action-failed'));
+            loadIssues(page);
+        });
+    }
+
+    function bindIssueActions(page) {
+        page.querySelectorAll('#flynnIssues [data-flynn-act]').forEach(function (button) {
+            button.addEventListener('click', function () {
+                var act = button.getAttribute('data-flynn-act');
+                var fingerprint = button.closest('[data-flynn-fp]').getAttribute('data-flynn-fp');
+
+                // Dismissal never expires. Anything that cannot be undone by doing it again gets
+                // asked about first; snooze does not, because waiting a week undoes it.
+                if (act === 'dismiss' && !window.confirm(t('ui.dismiss-confirm'))) {
+                    return;
+                }
+
+                page.querySelectorAll('#flynnIssues button').forEach(function (b) {
+                    b.disabled = true;
+                });
+                issueAction(page, fingerprint, act, act === 'snooze' ? '&days=7' : '');
+            });
+        });
+    }
+
+    function issueActions() {
+        return '<div class="flynn-issue-acts">' +
+            '<button is="emby-button" type="button" class="raised flynn-issue-act"' +
+              ' data-flynn-act="snooze">' + esc(t('ui.snooze-7')) + '</button>' +
+            '<button is="emby-button" type="button" class="raised flynn-issue-act"' +
+              ' data-flynn-act="dismiss">' + esc(t('ui.dismiss')) + '</button>' +
+            '</div>';
+    }
+
+    function issueRow(issue, actions) {
+        var withheldFor = issue.State === 'Open'
+            ? ''
+            : '<span class="flynn-sep"></span>' + esc(t('ui.state.' + String(issue.State).toLowerCase()));
+
+        return '<div class="flynn-issue flynn-' + esc(String(issue.Severity).toLowerCase()) + '"' +
+            ' data-flynn-fp="' + esc(issue.Fingerprint) + '">' +
+            '<div class="flynn-issue-title">' + esc(issue.Title) + '</div>' +
+            (issue.Detail ? '<div class="flynn-issue-detail">' + esc(issue.Detail) + '</div>' : '') +
+            '<div class="flynn-issue-foot">' + esc(issue.ModuleId) +
+            '<span class="flynn-sep"></span>' + esc(relative(issue.FirstSeen)) + withheldFor +
+            '</div>' + actions +
+            '</div>';
+    }
+
     function loadIssues(page) {
         var host = page.querySelector('#flynnIssues');
         if (!host) {
@@ -160,20 +221,30 @@
             if (inbox.Resolved) {
                 withheld.push(t('ui.withheld.resolved', inbox.Resolved));
             }
-            var foot = withheld.length
-                ? '<p class="flynn-withheld">' + esc(withheld.join('  \u00B7  ')) + '</p>'
-                : '';
+            // A count of what is hidden, with no way to see WHICH, is only a slightly better blind
+            // spot. The summary opens onto the list, each row with a way back.
+            var hidden = inbox.Withheld || [];
+            var foot = '';
+            if (withheld.length) {
+                foot = '<details class="flynn-withheld">' +
+                    '<summary>' + esc(withheld.join('  \u00B7  ')) + '</summary>' +
+                    (hidden.length
+                        ? hidden.map(function (issue) {
+                            return issueRow(issue,
+                                '<button is="emby-button" type="button" class="raised flynn-issue-act"' +
+                                ' data-flynn-act="restore">' + esc(t('ui.restore')) + '</button>');
+                        }).join('')
+                        : '<p class="fieldDescription">' + esc(t('ui.withheld-resolved-only')) + '</p>') +
+                    '</details>';
+            }
 
             host.innerHTML = (!inbox.Open || inbox.Open.length === 0)
                 ? '<p class="fieldDescription flynn-clear">' + esc(t('ui.nothing-to-do')) + '</p>' + foot
                 : inbox.Open.map(function (issue) {
-                    return '<div class="flynn-issue flynn-' + esc(String(issue.Severity).toLowerCase()) + '">' +
-                        '<div class="flynn-issue-title">' + esc(issue.Title) + '</div>' +
-                        (issue.Detail ? '<div class="flynn-issue-detail">' + esc(issue.Detail) + '</div>' : '') +
-                        '<div class="flynn-issue-foot">' + esc(issue.ModuleId) +
-                        '<span class="flynn-sep"></span>' + esc(relative(issue.FirstSeen)) + '</div>' +
-                        '</div>';
+                    return issueRow(issue, issueActions());
                 }).join('') + foot;
+
+            bindIssueActions(page);
         }, function () {
             // 503 while storage is down is expected; the module panel already explains it.
             host.innerHTML = '';
