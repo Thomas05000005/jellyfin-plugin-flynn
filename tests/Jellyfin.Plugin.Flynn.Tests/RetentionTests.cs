@@ -2,6 +2,7 @@ using System.Globalization;
 using Jellyfin.Plugin.Flynn.Core.Data;
 using Jellyfin.Plugin.Flynn.Core.Issues;
 using Jellyfin.Plugin.Flynn.Core.Localization;
+using Jellyfin.Plugin.Flynn.Core.Mutations;
 using Jellyfin.Plugin.Flynn.Modules.Storage;
 using Microsoft.Data.Sqlite;
 using Microsoft.Extensions.Logging.Abstractions;
@@ -168,6 +169,31 @@ public sealed class RetentionTests : IAsyncLifetime
         Assert.Equal(1, await CountAsync("mutation_log"));
     }
 
+    /// <summary>
+    /// Closes the gap the tests above leave open.
+    /// <para>
+    /// Every other mutation test here writes its row by hand, which proves the retention query
+    /// against the format the TEST chose. Timestamps live in the database as text, so a writer
+    /// using a different shape would not fail loudly -- the comparison would simply stop matching,
+    /// and a pruner that silently matches nothing looks exactly like a pruner that works. This one
+    /// goes through the real kernel, so the format under test is the one production writes.
+    /// </para>
+    /// </summary>
+    [Fact]
+    public async Task ARowWrittenByTheRealKernel_IsSeenByRetention()
+    {
+        var kernel = new MutationKernel(_database, _clock, NullLogger<MutationKernel>.Instance);
+        await kernel.ApplyAsync(new TrivialMutation(), WriteLevel.Server, CancellationToken.None);
+
+        Assert.Equal(1, await CountAsync("mutation_log"));
+
+        _clock.Advance(Retention.MutationLog + TimeSpan.FromDays(1));
+        var outcome = await _retention.RunAsync(CancellationToken.None);
+
+        Assert.Equal(1, outcome.MutationRecords);
+        Assert.Equal(0, await CountAsync("mutation_log"));
+    }
+
     [Fact]
     public async Task WithNothingToRemove_ItReportsNothingRemoved()
     {
@@ -210,6 +236,28 @@ public sealed class RetentionTests : IAsyncLifetime
             applied ? preparedAt.ToString("O", CultureInfo.InvariantCulture) : DBNull.Value);
         command.Parameters.AddWithValue("$prepared", preparedAt.ToString("O", CultureInfo.InvariantCulture));
         await command.ExecuteNonQueryAsync(CancellationToken.None);
+    }
+
+    /// <summary>The smallest thing the kernel will accept, so the row it writes is a real one.</summary>
+    private sealed class TrivialMutation : IMutation
+    {
+        public string ModuleId => "music";
+
+        public string Kind => "merge";
+
+        public WriteLevel Level => WriteLevel.Server;
+
+        public Task<MutationPreview> PreviewAsync(CancellationToken cancellationToken) =>
+            Task.FromResult(new MutationPreview(
+                [new MutationStep(LocalizedText.Of("test.step"), "target")], []));
+
+        public Task<IReadOnlyList<UndoEntry>> PrepareUndoAsync(CancellationToken cancellationToken) =>
+            Task.FromResult<IReadOnlyList<UndoEntry>>([new UndoEntry("target", "before")]);
+
+        public Task ApplyAsync(CancellationToken cancellationToken) => Task.CompletedTask;
+
+        public Task UndoAsync(IReadOnlyList<UndoEntry> entries, CancellationToken cancellationToken) =>
+            Task.CompletedTask;
     }
 
     private async Task<long> CountAsync(string table)

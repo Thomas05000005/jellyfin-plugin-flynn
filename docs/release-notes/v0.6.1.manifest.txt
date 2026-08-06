@@ -1,0 +1,8 @@
+Fixes six defects an adversarial review found in v0.6.0, one of them reproduced in a real browser:
+the admin page's escaping was safe in text and unsafe inside an attribute, so a subject containing
+a double quote -- an album written "Heroes", a macOS mount point -- truncated the element's data
+and could plant a working event handler. Also: a snooze that had run out was listed in the inbox
+and counted as hidden at the same time; dismissing an issue that had already closed itself
+answered success and invented a decision in the tally; the three inbox actions went at the database
+without checking it was up, where the read beside them answered a clean 503; and a snoozed issue
+now carries its expiry, so the page can say until when. Requires Jellyfin 12.0 or later.

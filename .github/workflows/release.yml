@@ -105,6 +105,9 @@ jobs:
       - name: Client scripts must be pure ASCII
         run: python3 build/check_client_ascii.py
 
+      - name: Client escaping must be safe in an attribute value
+        run: node build/test_client_escaping.js
+
       - name: Stage exactly what ships
         run: |
           mkdir -p staging

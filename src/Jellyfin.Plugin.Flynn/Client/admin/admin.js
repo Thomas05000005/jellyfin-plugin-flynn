@@ -25,10 +25,25 @@
         return value === undefined ? text : text.replace('{0}', value);
     }
 
+    /*
+     * Escapes for BOTH text content and attribute values, which is why the quotes are handled by
+     * hand rather than left to the serialiser.
+     *
+     * Setting textContent and reading innerHTML back escapes & < > and nothing else -- the
+     * serialiser has no reason to touch a quote inside a text node. That is fine until the same
+     * function is used inside an attribute, which it is in five places here. A value containing a
+     * double quote then closes the attribute early: the rest is parsed as further attributes, so
+     * data-flynn-fp silently truncates and, with the right text, an event handler appears on the
+     * element and actually runs.
+     *
+     * No module produces such a subject today -- a device id is major:minor or zfs:pool. But the
+     * documented contract for a subject is "a device id, an album, a path", and an album called
+     * "Heroes" is written with the quotes.
+     */
     function esc(value) {
         var node = document.createElement('span');
         node.textContent = value == null ? '' : String(value);
-        return node.innerHTML;
+        return node.innerHTML.replace(/"/g, '&quot;').replace(/'/g, '&#39;');
     }
 
     function relative(iso) {

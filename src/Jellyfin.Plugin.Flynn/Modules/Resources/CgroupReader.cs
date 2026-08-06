@@ -75,9 +75,15 @@ public sealed class CgroupReader
     /// v1 is deliberately not supported. Its files are laid out differently and it is being retired
     /// everywhere; claiming support and quietly reporting nothing would be worse than saying no.
     /// </para>
+    /// <para>
+    /// The presence of the file is the whole test. An <c>OperatingSystem.IsLinux()</c> guard used to
+    /// sit in front of it and answered the same question twice -- nothing outside Linux has a
+    /// readable <c>/sys/fs/cgroup/cpu.stat</c> -- while making the module that depends on this
+    /// impossible to test anywhere else. A test that can only run on the build machine is a test
+    /// nobody watches fail.
+    /// </para>
     /// </summary>
-    public bool IsAvailable =>
-        OperatingSystem.IsLinux() && File.Exists(Path.Combine(_root, "cpu.stat"));
+    public bool IsAvailable => File.Exists(Path.Combine(_root, "cpu.stat"));
 
     /// <summary>Takes one reading.</summary>
     /// <param name="now">The moment of the reading.</param>

@@ -32,6 +32,8 @@ Transformation — neither of which has a Jellyfin 12 build.
 **Storage** — how much each library holds and how much room is left on each device, measured
 nightly. Jellyfin's own dashboard shows paths but neither sizes nor free space.
 
+Since then: **Capacity**, which says when a disk runs out and refuses to answer before it has fourteen nightly readings, and **Resources**, which measures what Jellyfin costs including the ffmpeg children a process-level reading cannot see.
+
 That is the whole list. Flynn is early; the socle it is built on is further along than the
 features are.
 

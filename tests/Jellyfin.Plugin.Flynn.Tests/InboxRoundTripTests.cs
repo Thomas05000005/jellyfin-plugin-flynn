@@ -213,6 +213,87 @@ public sealed class InboxRoundTripTests : IAsyncLifetime
     }
 
     /// <summary>
+    /// An expired snooze is open again, and the counts have to agree with the list. They did not:
+    /// the list promoted it and the tally read the stored value, so the same issue sat in the inbox
+    /// and in the "hidden" count printed underneath it.
+    /// </summary>
+    [Fact]
+    public async Task AnExpiredSnooze_IsNotCountedAsHiddenWhileItIsAlsoInTheInbox()
+    {
+        var issue = await SweepOne();
+        var controller = Controller();
+        await controller.SnoozeIssue(issue.Fingerprint, 7, default);
+
+        _clock.Advance(TimeSpan.FromDays(8));
+
+        var inbox = await Inbox(controller);
+        Assert.Single(inbox.Open);
+        Assert.Equal(0, inbox.Snoozed);
+    }
+
+    /// <summary>
+    /// Dismissing something that already closed itself used to answer 204 and add it to the
+    /// dismissed tally -- inventing a decision nobody made, in the count that exists to record
+    /// exactly those.
+    /// </summary>
+    [Fact]
+    public async Task AnIssueThatClosedItself_CannotBeDismissed()
+    {
+        var issue = await SweepOne();
+        await _registry.ReconcileAsync("capacity", "capacity", [], CancellationToken.None);
+        var controller = Controller();
+
+        Assert.IsType<NotFoundResult>(await controller.DismissIssue(issue.Fingerprint, default));
+
+        var inbox = await Inbox(controller);
+        Assert.Equal(0, inbox.Dismissed);
+        Assert.Equal(1, inbox.Resolved);
+    }
+
+    /// <summary>
+    /// The read answered a clean 503 while the three actions beside it went at a database that was
+    /// not there.
+    /// </summary>
+    [Fact]
+    public async Task WithTheDatabaseDown_EveryActionSaysSoRatherThanThrowing()
+    {
+        var issue = await SweepOne();
+        var down = new DatabaseReadiness();
+        down.MarkFailed("the database could not be opened");
+        var controller = new DashboardController(
+            new ModuleRegistry([], NullLogger<ModuleRegistry>.Instance), _registry, null!, down)
+        {
+            ControllerContext = new ControllerContext { HttpContext = new DefaultHttpContext() },
+        };
+
+        foreach (var result in new[]
+        {
+            await controller.DismissIssue(issue.Fingerprint, default),
+            await controller.RestoreIssue(issue.Fingerprint, default),
+            await controller.SnoozeIssue(issue.Fingerprint, 7, default),
+        })
+        {
+            var status = Assert.IsType<ObjectResult>(result);
+            Assert.Equal(StatusCodes.Status503ServiceUnavailable, status.StatusCode);
+        }
+    }
+
+    /// <summary>A page that says "hidden" without saying until when is telling half the truth.</summary>
+    [Fact]
+    public async Task ASnoozedIssue_CarriesItsExpiryToThePage()
+    {
+        var issue = await SweepOne();
+        var controller = Controller();
+        await controller.SnoozeIssue(issue.Fingerprint, 7, default);
+
+        var withheld = Assert.Single((await Inbox(controller)).Withheld);
+
+        Assert.Equal("Snoozed", withheld.State);
+        Assert.NotNull(withheld.SnoozedUntil);
+        Assert.True(withheld.SnoozedUntil > _clock.GetUtcNow());
+    }
+
+    /// <summary>
     /// An issue that closed itself is not something anybody hid, so it does not belong in a list of
     /// decisions to reconsider -- it would bury the ones that were.
     /// </summary>

@@ -91,11 +91,10 @@ public sealed class DashboardController : ControllerBase
     [HttpGet("issues")]
     public async Task<ActionResult<InboxDto>> GetIssues(CancellationToken cancellationToken)
     {
-        if (!_readiness.IsReady)
+        var down = StorageDown();
+        if (down is not null)
         {
-            return StatusCode(
-                StatusCodes.Status503ServiceUnavailable,
-                new ProblemDetails { Title = _readiness.Failure ?? "Storage is unavailable." });
+            return down;
         }
 
         var strings = FlynnStrings.ForCulture(RequestCulture.For(Request));
@@ -111,7 +110,8 @@ public sealed class DashboardController : ControllerBase
             tracked.Issue.Detail?.Resolve(strings),
             tracked.FirstSeen,
             tracked.LastSeen,
-            tracked.State.ToString());
+            tracked.State.ToString(),
+            tracked.SnoozedUntil);
 
         return new InboxDto(
             open.Select(ToDto).ToList(),
@@ -205,9 +205,10 @@ public sealed class DashboardController : ControllerBase
     public async Task<ActionResult> DismissIssue(
         [FromQuery] string fingerprint,
         CancellationToken cancellationToken) =>
-        await _issues.DismissAsync(fingerprint, cancellationToken).ConfigureAwait(false)
+        StorageDown()
+        ?? (await _issues.DismissAsync(fingerprint, cancellationToken).ConfigureAwait(false)
             ? NoContent()
-            : NotFound();
+            : NotFound());
 
     /// <summary>Hides an issue for a while.</summary>
     /// <param name="fingerprint">The issue's identity. In the query string, see DismissIssue.</param>
@@ -225,6 +226,12 @@ public sealed class DashboardController : ControllerBase
             return BadRequest(new ProblemDetails { Title = "Snooze must be between 1 and 365 days." });
         }
 
+        var down = StorageDown();
+        if (down is not null)
+        {
+            return down;
+        }
+
         return await _issues.SnoozeAsync(fingerprint, DateTimeOffset.UtcNow.AddDays(days), cancellationToken)
             .ConfigureAwait(false)
             ? NoContent()
@@ -239,9 +246,26 @@ public sealed class DashboardController : ControllerBase
     public async Task<ActionResult> RestoreIssue(
         [FromQuery] string fingerprint,
         CancellationToken cancellationToken) =>
-        await _issues.RestoreAsync(fingerprint, cancellationToken).ConfigureAwait(false)
+        StorageDown()
+        ?? (await _issues.RestoreAsync(fingerprint, cancellationToken).ConfigureAwait(false)
             ? NoContent()
-            : NotFound();
+            : NotFound());
+
+    /// <summary>
+    /// The 503 every endpoint that touches the database owes the caller, or null when it is up.
+    /// <para>
+    /// Shared rather than repeated, because it was repeated once and then not: the read said 503
+    /// with a reason while the three actions beside it went straight at a database that was not
+    /// there. DatabaseReadiness exists to make that answerable; not asking it is the whole defect.
+    /// </para>
+    /// </summary>
+    /// <returns>A 503 result, or null.</returns>
+    private ActionResult? StorageDown() =>
+        _readiness.IsReady
+            ? null
+            : StatusCode(
+                StatusCodes.Status503ServiceUnavailable,
+                new ProblemDetails { Title = _readiness.Failure ?? "Storage is unavailable." });
 }
 
 /// <summary>The dashboard, as the admin page receives it.</summary>
@@ -303,6 +327,10 @@ public sealed record InboxDto(
 /// <param name="FirstSeen">When it was first detected.</param>
 /// <param name="LastSeen">When it was last detected.</param>
 /// <param name="State">Open, Snoozed or Dismissed, so the page can say why it is not in the inbox.</param>
+/// <param name="SnoozedUntil">
+/// When a snooze runs out, so the page can say "hidden until Tuesday" rather than just "hidden".
+/// Null for anything that is not snoozed.
+/// </param>
 public sealed record IssueDto(
     string Fingerprint,
     string ModuleId,
@@ -311,4 +339,5 @@ public sealed record IssueDto(
     string? Detail,
     DateTimeOffset FirstSeen,
     DateTimeOffset LastSeen,
-    string State);
+    string State,
+    DateTimeOffset? SnoozedUntil);

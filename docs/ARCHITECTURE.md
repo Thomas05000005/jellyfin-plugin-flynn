@@ -34,19 +34,28 @@ src/Jellyfin.Plugin.Flynn/
     Data/          SQLite connection + additive-only migrations
     Modules/       IFlynnModule, ModuleCard, ModuleRegistry      [done]
     Issues/        the one inbox: everything actionable lands here
-    Mutations/     dry-run -> apply -> undo manifest. Mandatory for every write.
-    Validation/    URL / colour / SSRF helpers, shared, mutation-tested
+    Mutations/     dry-run -> apply -> undo manifest. Mandatory for every write.  [inert]
+    Localization/  string catalogues, resolved for the reader's language
     Web/           script injection middleware
-  Modules/         one folder per feature area, self-contained
+  Modules/         one folder per feature area
+    Storage/  Forecast/  Resources/
   Client/
-    runtime/       shared client runtime (SPA hooks, config hot-reload, BroadcastChannel)
-    modules/       one bundle per module
+    runtime/       injected on every page. Draws nothing yet.
+    admin/         the admin page: one bundle, rendered from the module registry
 tests/Jellyfin.Plugin.Flynn.Tests/
 build/             meta.json + assemblies generation, packaging
 ```
 
-A module owns its C#, its client bundle, its tests and its own `CLAUDE.md`. Adding one must
-never mean editing the admin shell: the page renders from the registry.
+A module owns its C#, its tests and, once it has anything non-obvious in it, its own
+`CLAUDE.md`. Adding one must never mean editing the admin shell: the page renders from the registry.
+
+**Not yet true**: `Core/Validation/` does not exist -- nothing needs a URL or SSRF check until
+something calls outward, and inventing the helpers before their first caller would mean guessing at
+their shape. `.claude/rules/client-js.md` states a rule about them, which is a rule waiting for its
+code. `Client/modules/` does not exist either: one admin bundle has been enough, and splitting it
+before there is a second surface would be structure for its own sake. Neither module folder carries
+a `CLAUDE.md` yet, though `Modules/Storage/` has earned one -- it holds the mountinfo parsing and
+the ZFS reasoning.
 
 ---
 
@@ -55,9 +64,11 @@ never mean editing the admin shell: the page renders from the registry.
 ```csharp
 public interface IFlynnModule
 {
-    string Id { get; }            // lowercase kebab, config key AND route segment, never renamed
-    string DisplayName { get; }
-    string Summary { get; }
+    string Id { get; }              // lowercase kebab, config key AND route segment, never renamed
+    string NameKey { get; }         // a catalogue key, not text: the reader's language decides
+    string SummaryKey { get; }
+    ModuleCategory Category { get; }// which shelf the dashboard groups it under
+    bool EnabledByDefault { get; }  // absence of a saved preference is "not asked yet", not "no"
     Task<ModuleCard> BuildCardAsync(CancellationToken ct);
 }
 ```
@@ -65,6 +76,11 @@ public interface IFlynnModule
 `BuildCardAsync` is called on page load, so it reads pre-computed values — the scheduled task does
 the work, the page reads the result. Nothing expensive at render time; at 400 000 tracks that rule
 is the difference between a dashboard and an outage.
+
+`ResourcesModule` is the one exception, and it is a deliberate one: a CPU rate needs two readings,
+and there is nothing precomputed to read when the page is opened cold. It reuses a stored sample
+when one is recent enough and only falls back to taking a fresh pair 300 ms apart. Any module that
+wants to do the same needs a better reason than convenience.
 
 `ModuleRegistry` is the only caller. It runs modules concurrently, gives each one a 5 s deadline,
 and turns a throw, a hang or a disabled switch into a card instead of an exception. Caller
@@ -81,13 +97,16 @@ never shows plausible numbers, because plausible numbers feed deletion decisions
 `Mutations`; building them before the socle means building them twice.
 
 1. `Core/Modules` — contract + registry ✅
-2. `Core/Config` — ConfigStore, the single writer
-3. `Core/Data` — SQLite, additive-only migrations, tested against a **pre-existing** database
-4. `Core/Issues` — the inbox
+2. `Core/Config` — ConfigStore, the single writer ✅
+3. `Core/Data` — SQLite, additive-only migrations, tested against a **pre-existing** database ✅
+4. `Core/Issues` — the inbox ✅ (dismiss, snooze, restore, and the withheld list, since v0.6.0)
 5. `Core/Mutations` — dry-run / apply / undo. **Nothing writes before this exists.**
-6. `Core/Web` — script injection (port from MaintenanceDeluxe, it is proven)
-7. Admin shell rendered from the registry
-8. Then wave 1: Storage → Forecast → Resources → Prometheus
+   Built and tested, but **inert**: no `IMutation` exists, nothing resolves the kernel, and
+   `MaxWriteLevel` is read by nothing. Wiring it is the step before Music, which is the first
+   module that will write.
+6. `Core/Web` — script injection ✅ (proven on real rc3 and rc4 containers in CI)
+7. Admin shell rendered from the registry ✅
+8. Wave 1: Storage ✅ → Forecast ✅ → Resources ✅ → Prometheus (not started)
 
 ---
 

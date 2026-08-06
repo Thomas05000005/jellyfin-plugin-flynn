@@ -197,7 +197,16 @@ public sealed class IssueRegistry
     {
         await using var connection = await _database.OpenAsync(cancellationToken).ConfigureAwait(false);
         await using var read = connection.CreateCommand();
-        read.CommandText = "SELECT state, COUNT(*) FROM issue GROUP BY state";
+        // The state is computed the same way GetOpenAsync computes it, not read raw. A snooze
+        // whose date has passed is open again, and counting it as snoozed put the same issue in
+        // the inbox and in the "hidden" tally underneath it at the same time.
+        read.CommandText =
+            "SELECT CASE WHEN state = $snoozed AND snoozed_until <= $now THEN $open ELSE state END "
+            + "AS effective, COUNT(*) FROM issue GROUP BY effective";
+        read.Parameters.AddWithValue("$open", (int)IssueState.Open);
+        read.Parameters.AddWithValue("$snoozed", (int)IssueState.Snoozed);
+        read.Parameters.AddWithValue(
+            "$now", _clock.GetUtcNow().ToString("O", CultureInfo.InvariantCulture));
 
         var counts = new Dictionary<IssueState, int>();
         await using var rows = await read.ExecuteReaderAsync(cancellationToken).ConfigureAwait(false);
@@ -305,8 +314,15 @@ public sealed class IssueRegistry
 
         await using var connection = await _database.OpenAsync(cancellationToken).ConfigureAwait(false);
         await using var command = connection.CreateCommand();
-        command.CommandText = "UPDATE issue SET state = $state, snoozed_until = $until WHERE fingerprint = $fp";
+        // Resolved is excluded on purpose. An issue that closed itself is not something anyone
+        // is choosing to hide, and dismissing one used to answer 204 and add it to the dismissed
+        // count -- a decision the admin never made, sitting in the tally that exists to record
+        // exactly those.
+        command.CommandText =
+            "UPDATE issue SET state = $state, snoozed_until = $until "
+            + "WHERE fingerprint = $fp AND state <> $resolved";
         command.Parameters.AddWithValue("$state", (int)state);
+        command.Parameters.AddWithValue("$resolved", (int)IssueState.Resolved);
         command.Parameters.AddWithValue(
             "$until",
             until is null ? DBNull.Value : until.Value.ToString("O", CultureInfo.InvariantCulture));

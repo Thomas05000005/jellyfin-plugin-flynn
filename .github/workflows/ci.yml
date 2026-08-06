@@ -34,6 +34,11 @@ jobs:
       - name: Client scripts must be pure ASCII
         run: python3 build/check_client_ascii.py
 
+      # An escaping function that is safe in text and unsafe in an attribute is the kind of defect
+      # that passes review, since the wrong half is invisible until a value carries a quote.
+      - name: Client escaping must be safe in an attribute value
+        run: node build/test_client_escaping.js
+
       # find, not a ** glob: bash only recurses with globstar enabled, so ** would quietly
       # behave like * and skip anything nested deeper than one directory.
       - name: Client scripts must parse
