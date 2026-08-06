@@ -65,8 +65,17 @@ jobs:
           mkdir -p staging
           cp src/Jellyfin.Plugin.Flynn/bin/Release/net10.0/Jellyfin.Plugin.Flynn.dll staging/
 
+      # Not a release: the version comes from the csproj rather than a tag, and the blurb says so
+      # plainly. This artefact exists to prove the whitelist matches what is on disk and to give
+      # the smoke job something real to install -- it is never published.
       - name: Generate meta.json
-        run: python3 build/make_meta.py --staging staging
+        run: |
+          VERSION=$(grep -oP '(?<=<AssemblyVersion>)[^<]+' \
+            src/Jellyfin.Plugin.Flynn/Jellyfin.Plugin.Flynn.csproj)
+          python3 build/make_meta.py \
+            --staging staging \
+            --version "$VERSION" \
+            --changelog "Continuous integration build of $VERSION. Not a published release."
 
       # The whitelist is fail-closed and all-or-nothing: a listed file that is not present marks
       # the whole plugin Malfunctioned. So assert the two sets agree before anything ships.

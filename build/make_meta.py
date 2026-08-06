@@ -26,6 +26,10 @@ import struct
 import sys
 from pathlib import Path
 
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+
+from release_entry import TARGET_ABI, utc_stamp  # noqa: E402
+
 # Index of the CLI header in the PE optional header's data directory table. An RVA of 0 there
 # means "no managed metadata", i.e. a native image.
 _CLI_HEADER_DIRECTORY_INDEX = 14
@@ -75,10 +79,17 @@ def collect_assemblies(staging: Path) -> tuple[list[str], list[str]]:
     return managed, native
 
 
-def build_meta(manifest_path: Path, staging: Path) -> dict:
-    """Build the meta.json payload from the repository manifest and the staged files."""
+def build_meta(
+    manifest_path: Path, staging: Path, version: str, changelog: str, timestamp: str
+) -> dict:
+    """Build the meta.json payload from the repository manifest and the staged files.
+
+    The package-level fields (name, guid, owner) come from the manifest, because they are stable
+    facts about the plugin. The version-level ones are passed in, because at this point in the
+    release workflow the manifest deliberately does not know about this version yet -- it only
+    learns about it once the artefact exists and has been fetched back and verified.
+    """
     manifest = json.loads(manifest_path.read_text(encoding="utf-8"))[0]
-    version = manifest["versions"][0]
 
     managed, native = collect_assemblies(staging)
     if not managed:
@@ -94,15 +105,15 @@ def build_meta(manifest_path: Path, staging: Path) -> dict:
 
     return {
         "category": manifest["category"],
-        "changelog": version["changelog"],
+        "changelog": changelog,
         "description": manifest["description"],
         "guid": manifest["guid"],
         "name": manifest["name"],
         "overview": manifest["overview"],
         "owner": manifest["owner"],
-        "targetAbi": version["targetAbi"],
-        "timestamp": version["timestamp"],
-        "version": version["version"],
+        "targetAbi": TARGET_ABI,
+        "timestamp": timestamp,
+        "version": version,
         "status": "Active",
         "autoUpdate": True,
         "assemblies": managed,
@@ -118,12 +129,21 @@ def main() -> int:
         required=True,
         help="Directory holding exactly the files that will be zipped.",
     )
+    parser.add_argument("--version", required=True, help="Four part version, e.g. 0.6.0.0")
+    parser.add_argument("--changelog", required=True, help="Catalogue blurb for this version.")
+    parser.add_argument("--timestamp", default=None, help="Release time, UTC. Defaults to now.")
     args = parser.parse_args()
 
     if not args.staging.is_dir():
         raise SystemExit(f"Staging directory not found: {args.staging}")
 
-    meta = build_meta(args.manifest, args.staging)
+    meta = build_meta(
+        args.manifest,
+        args.staging,
+        args.version,
+        args.changelog,
+        args.timestamp or utc_stamp(),
+    )
     out = args.staging / "meta.json"
     out.write_text(json.dumps(meta, indent=2) + "\n", encoding="utf-8")
     print(f"Wrote {out} with {len(meta['assemblies'])} whitelisted assembly/assemblies.")

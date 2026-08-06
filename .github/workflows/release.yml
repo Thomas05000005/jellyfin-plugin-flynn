@@ -1,12 +1,24 @@
 name: Release
 
+# The order of the steps below is the whole design.
+#
+# manifest.json is a promise made to every Jellyfin server that has this repository configured:
+# "download this URL, and its md5 will be exactly this". The entry is therefore written LAST, from
+# a checksum taken off the artefact after it has been fetched back from GitHub -- never before, and
+# never from a local file.
+#
+# It also means this workflow is the file's only author. When a human added the entry beforehand
+# and the workflow patched the checksum in afterwards, two things followed from the sharing: a
+# window in which the manifest advertised a version whose zip did not exist yet (a real failed
+# install, hit in practice), and a push race on every single release.
+
 on:
   push:
     tags: ['v*']
   workflow_dispatch:
     inputs:
       tag:
-        description: 'Tag to release, e.g. v0.1.0'
+        description: 'Tag to release, e.g. v0.6.0'
         required: true
 
 permissions:
@@ -36,40 +48,49 @@ jobs:
         run: |
           TAG="${{ github.event.inputs.tag || github.ref_name }}"
           echo "tag=$TAG" >> "$GITHUB_OUTPUT"
-          # Jellyfin wants four parts everywhere: v0.1.0 becomes 0.1.0.0.
+          # Jellyfin wants four parts everywhere: v0.6.0 becomes 0.6.0.0.
           echo "four=${TAG#v}.0" >> "$GITHUB_OUTPUT"
+          echo "stamp=$(date -u +%Y-%m-%dT%H:%M:%S.0000000Z)" >> "$GITHUB_OUTPUT"
 
-      # A release whose assembly version disagrees with its manifest entry installs and then
-      # reports the wrong version forever, and the ETag that busts the browser cache is built from
-      # it. Cheaper to refuse here.
-      - name: The tag, the assembly and the manifest must agree
+      # Everything that can be known before building anything. A release that fails at the end
+      # leaves a published tag and a half-written manifest behind, so it is much cheaper to refuse
+      # up front than to unwind later.
+      - name: Preflight
         run: |
           python3 - <<'PY'
           import json, os, re, sys
           from pathlib import Path
+          sys.path.insert(0, "build")
+          from release_entry import changelog_for, four_part
 
-          four = os.environ["FOUR"]
+          tag = os.environ["TAG"]
+          four = four_part(tag)
+          if four != os.environ["FOUR"]:
+              raise SystemExit(f"version mismatch: {four} vs {os.environ['FOUR']}")
+
+          # The assembly version is what the server reports forever after install, and the ETag
+          # that busts the browser cache is built from it.
           csproj = Path("src/Jellyfin.Plugin.Flynn/Jellyfin.Plugin.Flynn.csproj").read_text()
-
           for field in ("AssemblyVersion", "FileVersion"):
               found = re.search(rf"<{field}>([^<]+)</{field}>", csproj).group(1)
               if found != four:
                   raise SystemExit(f"{field} is {found}, tag says {four}")
 
-          top = json.loads(Path("manifest.json").read_text())[0]["versions"][0]
-          if top["version"] != four:
-              raise SystemExit(f"manifest top version is {top['version']}, tag says {four}")
+          # Fails loudly if the catalogue blurb is missing or empty. It is the only description a
+          # stranger sees before installing.
+          blurb = changelog_for(tag, Path("."))
 
-          expected = (
-              f"https://github.com/{os.environ['REPO_OWNER']}/{os.environ['REPO_NAME']}"
-              f"/releases/download/{os.environ['TAG']}/Flynn-{os.environ['TAG']}.zip"
-          )
-          # Case sensitive on GitHub. A typo here publishes a release that installs as a 404 while
-          # every other check stays green, which has happened before on the predecessor plugin.
-          if top["sourceUrl"] != expected:
-              raise SystemExit(f"manifest sourceUrl is\n  {top['sourceUrl']}\nexpected\n  {expected}")
+          notes = Path(f"docs/release-notes/{tag}.md")
+          if not notes.is_file():
+              raise SystemExit(f"No release notes at {notes}")
 
-          print(f"tag, assembly and manifest all agree on {four}")
+          # Re-running a release must not add the version twice; Jellyfin would list it twice and
+          # choose between them by position.
+          published = json.loads(Path("manifest.json").read_text())[0]["versions"]
+          if any(v["version"] == four for v in published):
+              raise SystemExit(f"{four} is already published in manifest.json")
+
+          print(f"{tag} -> {four}, blurb {len(blurb)} chars, notes and manifest both clear")
           PY
         env:
           FOUR: ${{ steps.version.outputs.four }}
@@ -88,7 +109,17 @@ jobs:
         run: |
           mkdir -p staging
           cp src/Jellyfin.Plugin.Flynn/bin/Release/net10.0/Jellyfin.Plugin.Flynn.dll staging/
-          python3 build/make_meta.py --staging staging
+          BLURB=$(python3 -c "
+          import sys; sys.path.insert(0, 'build')
+          from pathlib import Path
+          from release_entry import changelog_for
+          print(changelog_for('${{ steps.version.outputs.tag }}', Path('.')))
+          ")
+          python3 build/make_meta.py \
+            --staging staging \
+            --version "${{ steps.version.outputs.four }}" \
+            --changelog "$BLURB" \
+            --timestamp "${{ steps.version.outputs.stamp }}"
 
       - name: Zip and checksum
         id: package
@@ -108,31 +139,41 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
 
-      # Done last and committed back, because the checksum cannot be known until the artefact
-      # exists. Until this lands, the manifest advertises a placeholder and Jellyfin refuses the
-      # download rather than installing something unverified.
-      - name: Write the real checksum into the manifest
+      # The manifest promises a URL and a checksum, so both are proven against what GitHub actually
+      # serves before the promise is written down. A 404 page hashes perfectly happily, which is
+      # exactly how a wrong checksum was once reported here as correct.
+      - name: The published asset must be real and must match
         run: |
-          python3 - <<'PY'
-          import json, os
-          from datetime import datetime, timezone
-          from pathlib import Path
+          python3 build/verify_asset.py \
+            --url "https://github.com/$REPO_OWNER/$REPO_NAME/releases/download/${{ steps.version.outputs.tag }}/${{ steps.package.outputs.zip }}" \
+            --md5 "${{ steps.package.outputs.md5 }}"
 
-          path = Path("manifest.json")
-          data = json.loads(path.read_text())
-          top = data[0]["versions"][0]
-          top["checksum"] = os.environ["MD5"]
-          top["timestamp"] = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%S.0000000Z")
-          path.write_text(json.dumps(data, indent=4) + "\n")
-          print(f"checksum {os.environ['MD5']}")
-          PY
-        env:
-          MD5: ${{ steps.package.outputs.md5 }}
+      - name: Announce it in the manifest
+        run: |
+          python3 build/add_manifest_entry.py \
+            --tag "${{ steps.version.outputs.tag }}" \
+            --checksum "${{ steps.package.outputs.md5 }}" \
+            --timestamp "${{ steps.version.outputs.stamp }}" \
+            --owner "$REPO_OWNER" \
+            --repo "$REPO_NAME"
 
+      # This workflow is manifest.json's only author, so a concurrent push can only ever move the
+      # branch tip -- it can never touch this file. Rebasing therefore always succeeds; the retry
+      # exists for the ordinary case of someone pushing while the build ran.
       - name: Commit the manifest
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add manifest.json
-          git commit -m "chore: checksum and timestamp for ${{ steps.version.outputs.tag }}"
-          git push origin HEAD:main
+          git commit -m "chore: publish ${{ steps.version.outputs.tag }} in the manifest"
+          for attempt in 1 2 3; do
+            if git push origin HEAD:main; then
+              echo "pushed on attempt $attempt"
+              exit 0
+            fi
+            echo "push rejected, rebasing and retrying"
+            git fetch origin main
+            git rebase origin/main
+          done
+          echo "could not push the manifest after 3 attempts"
+          exit 1
