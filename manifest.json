@@ -8,6 +8,14 @@
         "category": "General",
         "versions": [
             {
+                "version": "0.6.0.0",
+                "changelog": "The issue inbox becomes usable. Dismiss, snooze for a week, or bring back anything hidden -- and the withheld ones are now listed rather than only counted, because a count with no way to see what it counts is a slightly better blind spot rather than a way back. The three endpoints already existed and could not work: an issue fingerprint contains slashes, so the route segment they were declared on could never match one. Also fixes eleven French strings that shipped without their accents, and shows what the CPU percentage is a share of, since eighty percent of a quota means throttling is imminent while eighty percent of a machine only means busy. Requires Jellyfin 12.0 or later.",
+                "targetAbi": "12.0.0.0",
+                "sourceUrl": "https://github.com/Thomas05000005/jellyfin-plugin-flynn/releases/download/v0.6.0/Flynn-v0.6.0.zip",
+                "checksum": "79798aa7ccffad6f6637daff957bfec8",
+                "timestamp": "2026-08-06T14:11:23.0000000Z"
+            },
+            {
                 "version": "0.5.0.0",
                 "changelog": "Adds Resources: what Jellyfin actually costs, transcodes included. The figures come from the container's control group rather than from the .NET process, which cannot see the ffmpeg children that do most of the work -- a process-level reading shows a nearly idle server during four simultaneous transcodes. Memory excludes reclaimable page cache, which on a real server was more than half of what the group is charged for. Requires cgroup v2 on Linux; says so plainly where that is unavailable. Requires Jellyfin 12.0 or later.",
                 "targetAbi": "12.0.0.0",
