@@ -261,7 +261,7 @@ public sealed class InboxRoundTripTests : IAsyncLifetime
         var down = new DatabaseReadiness();
         down.MarkFailed("the database could not be opened");
         var controller = new DashboardController(
-            new ModuleRegistry([], NullLogger<ModuleRegistry>.Instance), _registry, null!, down)
+            new ModuleRegistry([], NullLogger<ModuleRegistry>.Instance), _registry, null!, down, _clock)
         {
             ControllerContext = new ControllerContext { HttpContext = new DefaultHttpContext() },
         };
@@ -333,7 +333,8 @@ public sealed class InboxRoundTripTests : IAsyncLifetime
             new ModuleRegistry([], NullLogger<ModuleRegistry>.Instance),
             _registry,
             null!,
-            Ready())
+            Ready(),
+            _clock)
         {
             ControllerContext = new ControllerContext { HttpContext = new DefaultHttpContext() },
         };

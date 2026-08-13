@@ -1,0 +1,9 @@
+Adds Music, the first module outside System, and it only reads. It answers one question for now:
+how many of your tracks actually have a loudness value, and why the rest do not. That distinction
+is the module -- Jellyfin's loudness measuring is off by default and appears in exactly one place
+in the whole server, so a library with no values has not failed at anything, and saying otherwise
+would be the first thing this ever got wrong. It also names a real gap: the server reads exactly
+one tag, REPLAYGAIN_TRACK_GAIN, so files carrying only an album gain or the Opus R128_TRACK_GAIN
+are read as having none. Walks the library by album rather than by page, because paging it costs
+O(n squared) and a library heading for four hundred thousand tracks would never finish. Requires
+Jellyfin 12.0 or later.

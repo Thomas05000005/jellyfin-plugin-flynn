@@ -92,5 +92,24 @@ public static class Migrations
             """
             ALTER TABLE storage_device_snapshot ADD COLUMN fs_type TEXT NOT NULL DEFAULT '';
             """),
+
+        new Migration(
+            5,
+            "music loudness snapshots",
+            """
+            CREATE TABLE music_loudness_snapshot (
+                taken_at     TEXT    NOT NULL,
+                library_id   TEXT    NOT NULL,
+                library_name TEXT    NOT NULL,
+                scan_enabled INTEGER NOT NULL,
+                tracks       INTEGER NOT NULL,
+                from_tag     INTEGER NOT NULL,
+                measured     INTEGER NOT NULL,
+                PRIMARY KEY (taken_at, library_id)
+            );
+
+            CREATE INDEX ix_music_loudness_library
+                ON music_loudness_snapshot (library_id, taken_at);
+            """),
     ];
 }

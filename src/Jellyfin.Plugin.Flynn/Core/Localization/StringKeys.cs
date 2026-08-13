@@ -79,6 +79,28 @@ public static class StringKeys
     public const string UiWithheldSnoozed = "ui.withheld.snoozed";
     /// <summary>Admin page chrome: <c>ui.withheld.resolved</c>.</summary>
     public const string UiWithheldResolved = "ui.withheld.resolved";
+
+    /// <summary>Music module name: <c>music.name</c>.</summary>
+    public const string MusicName = "music.name";
+    /// <summary>Music module summary: <c>music.summary</c>.</summary>
+    public const string MusicSummary = "music.summary";
+    /// <summary>Before the first audit has run: <c>music.no-audit</c>.</summary>
+    public const string MusicNoAudit = "music.no-audit";
+    /// <summary>No music at all: <c>music.empty</c>.</summary>
+    public const string MusicEmpty = "music.empty";
+    /// <summary>Loudness coverage headline: <c>music.loudness-headline</c>.</summary>
+    public const string MusicLoudnessHeadline = "music.loudness-headline";
+    /// <summary>Loudness coverage detail: <c>music.loudness-detail</c>.</summary>
+    public const string MusicLoudnessDetail = "music.loudness-detail";
+    /// <summary>Said when no library has the scan switched on: <c>music.scan-off</c>.</summary>
+    public const string MusicScanOff = "music.scan-off";
+    /// <summary>Issue title, scan switched off: <c>issue.loudness.scan-off</c>.</summary>
+    public const string IssueLoudnessScanOff = "issue.loudness.scan-off";
+    /// <summary>Issue title, scan on but incomplete: <c>issue.loudness.incomplete</c>.</summary>
+    public const string IssueLoudnessIncomplete = "issue.loudness.incomplete";
+    /// <summary>Issue detail: <c>issue.loudness.detail</c>.</summary>
+    public const string IssueLoudnessDetail = "issue.loudness.detail";
+
     /// <summary>Admin page chrome: <c>ui.toggle-failed</c>.</summary>
     public const string UiToggleFailed = "ui.toggle-failed";
     /// <summary>Issue state, for a row that is not in the inbox: <c>ui.state.snoozed</c>.</summary>
@@ -200,6 +222,16 @@ public static class StringKeys
         UiDaysAgo,
         UiWithheldDismissed,
         UiWithheldSnoozed,
+        MusicName,
+        MusicSummary,
+        MusicNoAudit,
+        MusicEmpty,
+        MusicLoudnessHeadline,
+        MusicLoudnessDetail,
+        MusicScanOff,
+        IssueLoudnessScanOff,
+        IssueLoudnessIncomplete,
+        IssueLoudnessDetail,
         UiWithheldResolved,
         UiToggleFailed,
         UiStateSnoozed,

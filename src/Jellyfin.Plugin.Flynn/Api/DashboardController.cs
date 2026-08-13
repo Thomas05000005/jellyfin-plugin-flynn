@@ -27,22 +27,30 @@ public sealed class DashboardController : ControllerBase
     private readonly IssueRegistry _issues;
     private readonly ConfigStore _config;
     private readonly DatabaseReadiness _readiness;
+    private readonly TimeProvider _clock;
 
     /// <summary>Initializes a new instance of the <see cref="DashboardController"/> class.</summary>
     /// <param name="modules">The module registry.</param>
     /// <param name="issues">The issue registry.</param>
     /// <param name="config">The configuration store.</param>
     /// <param name="readiness">Whether storage came up.</param>
+    /// <param name="clock">
+    /// Time source. The same one the registry compares against, which is the point: computing a
+    /// snooze deadline from the wall clock while the registry decides expiry from an injected one
+    /// leaves the two disagreeing, and a test that moves time cannot see its own snooze expire.
+    /// </param>
     public DashboardController(
         ModuleRegistry modules,
         IssueRegistry issues,
         ConfigStore config,
-        DatabaseReadiness readiness)
+        DatabaseReadiness readiness,
+        TimeProvider clock)
     {
         _modules = modules;
         _issues = issues;
         _config = config;
         _readiness = readiness;
+        _clock = clock;
     }
 
     /// <summary>Returns one card per registered module.</summary>
@@ -232,7 +240,7 @@ public sealed class DashboardController : ControllerBase
             return down;
         }
 
-        return await _issues.SnoozeAsync(fingerprint, DateTimeOffset.UtcNow.AddDays(days), cancellationToken)
+        return await _issues.SnoozeAsync(fingerprint, _clock.GetUtcNow().AddDays(days), cancellationToken)
             .ConfigureAwait(false)
             ? NoContent()
             : NotFound();

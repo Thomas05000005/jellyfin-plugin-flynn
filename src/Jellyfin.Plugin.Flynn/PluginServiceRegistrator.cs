@@ -5,6 +5,7 @@ using Jellyfin.Plugin.Flynn.Core.Modules;
 using Jellyfin.Plugin.Flynn.Core.Mutations;
 using Jellyfin.Plugin.Flynn.Core.Web;
 using Jellyfin.Plugin.Flynn.Modules.Forecast;
+using Jellyfin.Plugin.Flynn.Modules.Music;
 using Jellyfin.Plugin.Flynn.Modules.Resources;
 using Jellyfin.Plugin.Flynn.Modules.Storage;
 using Microsoft.AspNetCore.Hosting;
@@ -76,6 +77,14 @@ public sealed class PluginServiceRegistrator : IPluginServiceRegistrator
         serviceCollection.AddSingleton<IFlynnModule>(s => s.GetRequiredService<ForecastModule>());
         serviceCollection.AddSingleton<CgroupReader>();
         serviceCollection.AddSingleton<IFlynnModule, ResourcesModule>();
+
+        serviceCollection.AddSingleton<ReplayGainAudit>();
+        serviceCollection.AddSingleton<MusicRepository>();
+        // Same shape as ForecastModule: one instance, handed to the module collection as itself,
+        // because the nightly task and the dashboard have to be looking at the same object.
+        serviceCollection.AddSingleton<MusicModule>();
+        serviceCollection.AddSingleton<IFlynnModule>(s => s.GetRequiredService<MusicModule>());
+        serviceCollection.AddSingleton<IScheduledTask, MusicAuditTask>();
 
         // An IStartupFilter is all it takes for ASP.NET Core to wrap the pipeline; the
         // server needs no knowledge of us.
