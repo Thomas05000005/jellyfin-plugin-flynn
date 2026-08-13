@@ -8,6 +8,14 @@
         "category": "General",
         "versions": [
             {
+                "version": "0.7.0.0",
+                "changelog": "Adds Music, the first module outside System, and it only reads. It answers one question for now: how many of your tracks actually have a loudness value, and why the rest do not. That distinction is the module -- Jellyfin's loudness measuring is off by default and appears in exactly one place in the whole server, so a library with no values has not failed at anything, and saying otherwise would be the first thing this ever got wrong. It also names a real gap: the server reads exactly one tag, REPLAYGAIN_TRACK_GAIN, so files carrying only an album gain or the Opus R128_TRACK_GAIN are read as having none. Walks the library by album rather than by page, because paging it costs O(n squared) and a library heading for four hundred thousand tracks would never finish. Requires Jellyfin 12.0 or later.",
+                "targetAbi": "12.0.0.0",
+                "sourceUrl": "https://github.com/Thomas05000005/jellyfin-plugin-flynn/releases/download/v0.7.0/Flynn-v0.7.0.zip",
+                "checksum": "2c424ca0c1934e3f4d8f3bc5b6150764",
+                "timestamp": "2026-08-13T16:49:48.0000000Z"
+            },
+            {
                 "version": "0.6.1.0",
                 "changelog": "Fixes six defects an adversarial review found in v0.6.0, one of them reproduced in a real browser: the admin page's escaping was safe in text and unsafe inside an attribute, so a subject containing a double quote -- an album written \"Heroes\", a macOS mount point -- truncated the element's data and could plant a working event handler. Also: a snooze that had run out was listed in the inbox and counted as hidden at the same time; dismissing an issue that had already closed itself answered success and invented a decision in the tally; the three inbox actions went at the database without checking it was up, where the read beside them answered a clean 503; and a snoozed issue now carries its expiry, so the page can say until when. Requires Jellyfin 12.0 or later.",
                 "targetAbi": "12.0.0.0",
