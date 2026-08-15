@@ -130,6 +130,45 @@ public sealed class MusicLoudnessTests
         Assert.Equal(100, card.Detail.Args[1]);
     }
 
+    /// <summary>
+    /// The test that was missing, and the reason the card was wrong on a real server.
+    /// <para>
+    /// Two libraries, one fully covered and one not measured at all. Averaging them gives 11%, a
+    /// figure that describes neither and points at nothing to do. The card has to name the library
+    /// that needs attention and quote ITS number.
+    /// </para>
+    /// </summary>
+    [Fact]
+    public async Task TwoLibrariesInDifferentStates_AreNotAveragedIntoOneMeaninglessNumber()
+    {
+        await using var fixture = await Fixture.CreateAsync();
+        await fixture.SaveAsync(
+            new LibraryLoudness(Guid.NewGuid(), "Musiques", true, 22350, 22350, 0),
+            new LibraryLoudness(Guid.NewGuid(), "Musiques2", false, 174927, 0, 0));
+
+        var card = await fixture.Module.BuildCardAsync(CancellationToken.None);
+
+        // The worst library, by name, with its own coverage -- not the 11% average.
+        Assert.Equal("Musiques2", card.Headline.Args[0]);
+        Assert.Equal(0, card.Headline.Args[1]);
+        Assert.Equal(ModuleState.Degraded, card.State);
+
+        // And the detail says the rest of the server is fine, so 0% does not read as a disaster.
+        Assert.Equal(StringKeys.MusicOtherLibraries, card.Detail!.Key);
+        Assert.Equal(100, card.Detail.Args[1]);
+    }
+
+    [Fact]
+    public async Task WithOneLibraryOnly_TheDetailIsJustTheReason()
+    {
+        await using var fixture = await Fixture.CreateAsync();
+        await fixture.SaveAsync(new LibraryLoudness(Guid.NewGuid(), "Musique", false, 100, 0, 0));
+
+        var card = await fixture.Module.BuildCardAsync(CancellationToken.None);
+
+        Assert.Equal(StringKeys.MusicScanOff, card.Detail!.Key);
+    }
+
     [Fact]
     public async Task AWellCoveredLibrary_IsHealthy()
     {

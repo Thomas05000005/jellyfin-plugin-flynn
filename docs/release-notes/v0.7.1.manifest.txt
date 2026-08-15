@@ -1,0 +1,6 @@
+Stops the Music card averaging across libraries that are in different states. On the server this
+was written for, one music library sat at 100% because its loudness scan had been switched on and
+the other at 0% because it had not; the card showed their average, 11%, a figure that described
+neither library and pointed at nothing to do. It now names the library that needs attention and
+quotes its own number, and says plainly how the rest of the server looks so that a 0% reads as the
+setting it is rather than as a fault. Requires Jellyfin 12.0 or later.

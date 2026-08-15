@@ -86,20 +86,41 @@ public sealed class MusicModule : IFlynnModule
                 takenAt ?? _clock.GetUtcNow());
         }
 
-        // The distinction the whole module turns on. A library whose scan was never switched on has
-        // not failed at anything, and calling that a problem would be the first thing an admin
-        // learned to ignore here.
-        var offEverywhere = latest.All(l => !l.ScanEnabled);
-        var share = (int)Math.Round((double)covered / tracks * 100);
+        // Never average across libraries whose situation differs. On the server this was written
+        // for, one library sits at 100% because its scan was switched on and the other at 0%
+        // because it was not; the average is 11%, a figure that describes neither and suggests no
+        // action. The admin who read it learned nothing, which is how it was reported.
+        var worst = latest.Where(l => l.Tracks > 0).OrderBy(l => l.Coverage).FirstOrDefault();
+        if (worst is null)
+        {
+            return new ModuleCard(
+                Id, ModuleState.Healthy, LocalizedText.Of(StringKeys.MusicEmpty), null,
+                takenAt ?? _clock.GetUtcNow());
+        }
 
-        var detail = offEverywhere
+        var others = latest.Where(l => l.Tracks > 0 && l.LibraryId != worst.LibraryId).ToList();
+        var headline = LocalizedText.Of(
+            StringKeys.MusicLoudnessHeadline,
+            worst.LibraryName,
+            (int)Math.Round(worst.Coverage * 100));
+
+        // The detail says why, and what the other libraries look like -- because "0%" alone reads
+        // as a fault when it is a setting, and hides that the rest of the server is fine.
+        var reason = worst.Gap == LoudnessGap.ScanDisabled
             ? LocalizedText.Of(StringKeys.MusicScanOff)
-            : LocalizedText.Of(StringKeys.MusicLoudnessDetail, covered, tracks);
+            : LocalizedText.Of(StringKeys.MusicLoudnessDetail, worst.Covered, worst.Tracks);
+
+        var detail = others.Count == 0
+            ? reason
+            : LocalizedText.Of(
+                StringKeys.MusicOtherLibraries,
+                reason,
+                (int)Math.Round(others.Average(l => l.Coverage) * 100));
 
         return new ModuleCard(
             Id,
-            (double)covered / tracks >= CoverageToWarn ? ModuleState.Healthy : ModuleState.Degraded,
-            LocalizedText.Of(StringKeys.MusicLoudnessHeadline, share),
+            worst.Coverage >= CoverageToWarn ? ModuleState.Healthy : ModuleState.Degraded,
+            headline,
             detail,
             takenAt ?? _clock.GetUtcNow());
     }

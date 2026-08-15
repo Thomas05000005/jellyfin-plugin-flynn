@@ -92,6 +92,8 @@ public static class StringKeys
     public const string MusicLoudnessHeadline = "music.loudness-headline";
     /// <summary>Loudness coverage detail: <c>music.loudness-detail</c>.</summary>
     public const string MusicLoudnessDetail = "music.loudness-detail";
+    /// <summary>How the other music libraries look: <c>music.other-libraries</c>.</summary>
+    public const string MusicOtherLibraries = "music.other-libraries";
     /// <summary>Said when no library has the scan switched on: <c>music.scan-off</c>.</summary>
     public const string MusicScanOff = "music.scan-off";
     /// <summary>Issue title, scan switched off: <c>issue.loudness.scan-off</c>.</summary>
@@ -228,6 +230,7 @@ public static class StringKeys
         MusicEmpty,
         MusicLoudnessHeadline,
         MusicLoudnessDetail,
+        MusicOtherLibraries,
         MusicScanOff,
         IssueLoudnessScanOff,
         IssueLoudnessIncomplete,
