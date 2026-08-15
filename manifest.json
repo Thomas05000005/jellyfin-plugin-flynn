@@ -8,6 +8,14 @@
         "category": "General",
         "versions": [
             {
+                "version": "0.7.1.0",
+                "changelog": "Stops the Music card averaging across libraries that are in different states. On the server this was written for, one music library sat at 100% because its loudness scan had been switched on and the other at 0% because it had not; the card showed their average, 11%, a figure that described neither library and pointed at nothing to do. It now names the library that needs attention and quotes its own number, and says plainly how the rest of the server looks so that a 0% reads as the setting it is rather than as a fault. Requires Jellyfin 12.0 or later.",
+                "targetAbi": "12.0.0.0",
+                "sourceUrl": "https://github.com/Thomas05000005/jellyfin-plugin-flynn/releases/download/v0.7.1/Flynn-v0.7.1.zip",
+                "checksum": "58faea73707d20dcc02972e8b3c68fba",
+                "timestamp": "2026-08-15T18:31:48.0000000Z"
+            },
+            {
                 "version": "0.7.0.0",
                 "changelog": "Adds Music, the first module outside System, and it only reads. It answers one question for now: how many of your tracks actually have a loudness value, and why the rest do not. That distinction is the module -- Jellyfin's loudness measuring is off by default and appears in exactly one place in the whole server, so a library with no values has not failed at anything, and saying otherwise would be the first thing this ever got wrong. It also names a real gap: the server reads exactly one tag, REPLAYGAIN_TRACK_GAIN, so files carrying only an album gain or the Opus R128_TRACK_GAIN are read as having none. Walks the library by album rather than by page, because paging it costs O(n squared) and a library heading for four hundred thousand tracks would never finish. Requires Jellyfin 12.0 or later.",
                 "targetAbi": "12.0.0.0",
