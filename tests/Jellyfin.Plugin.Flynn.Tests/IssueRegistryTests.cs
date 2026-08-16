@@ -11,6 +11,7 @@ namespace Jellyfin.Plugin.Flynn.Tests;
 /// The behaviours that decide whether the inbox stays useful: problems that go away close
 /// themselves, the same finding two nights running is one entry, and a dismissal actually holds.
 /// </summary>
+[Collection(SqliteCollection.Name)]
 public sealed class IssueRegistryTests : IAsyncLifetime
 {
     private const string Module = "storage";

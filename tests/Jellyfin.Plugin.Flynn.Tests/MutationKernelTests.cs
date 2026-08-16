@@ -11,6 +11,7 @@ namespace Jellyfin.Plugin.Flynn.Tests;
 /// The kernel's promises: nothing above the configured level, nothing that cannot be reversed, and
 /// the manifest on disk before the change is made rather than after.
 /// </summary>
+[Collection(SqliteCollection.Name)]
 public sealed class MutationKernelTests : IAsyncLifetime
 {
     private readonly string _directory =

@@ -22,6 +22,7 @@ namespace Jellyfin.Plugin.Flynn.Tests;
 /// neither visible from the layer the other was tested at. These tests cross that layer.
 /// </para>
 /// </summary>
+[Collection(SqliteCollection.Name)]
 public sealed class InboxRoundTripTests : IAsyncLifetime
 {
     private readonly string _directory =

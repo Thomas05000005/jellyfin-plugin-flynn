@@ -19,6 +19,7 @@ namespace Jellyfin.Plugin.Flynn.Tests;
 /// Most of the tests here exist to hold those two lines.
 /// </para>
 /// </summary>
+[Collection(SqliteCollection.Name)]
 public sealed class RetentionTests : IAsyncLifetime
 {
     private readonly string _directory =

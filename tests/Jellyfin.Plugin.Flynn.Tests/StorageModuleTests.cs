@@ -13,6 +13,7 @@ namespace Jellyfin.Plugin.Flynn.Tests;
 /// computes anything on page load is an outage, and one that shows last week's numbers as if they
 /// were current is worse than one that admits it has nothing.
 /// </summary>
+[Collection(SqliteCollection.Name)]
 public sealed class StorageModuleTests : IAsyncLifetime
 {
     private readonly string _directory =

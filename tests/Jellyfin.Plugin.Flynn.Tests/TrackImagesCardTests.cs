@@ -12,6 +12,7 @@ namespace Jellyfin.Plugin.Flynn.Tests;
 /// <summary>
 /// What the stored cover art card says, and what it refuses to say.
 /// </summary>
+[Collection(SqliteCollection.Name)]
 public sealed class TrackImagesCardTests
 {
     private const long Gigabyte = 1024L * 1024 * 1024;

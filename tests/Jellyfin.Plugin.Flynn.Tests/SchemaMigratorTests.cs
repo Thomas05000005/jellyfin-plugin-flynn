@@ -10,6 +10,7 @@ namespace Jellyfin.Plugin.Flynn.Tests;
 /// version. An empty database migrates correctly almost by accident, so a suite that only ever
 /// starts from empty proves very little.
 /// </summary>
+[Collection(SqliteCollection.Name)]
 public sealed class SchemaMigratorTests : IDisposable
 {
     private readonly string _directory =
