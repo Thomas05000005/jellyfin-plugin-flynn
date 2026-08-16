@@ -52,6 +52,43 @@ of its data blob. Touch tracks once.
 - Everything on `ILibraryManager` is synchronous and blocking. A full walk holds a thread-pool
   thread, which is why it belongs in the nightly task and never in `BuildCardAsync`.
 
+## Per-track cover art: the deduplication the server undoes one step later
+
+Three steps, each reasonable alone, whose combination stores one image once per track.
+
+1. `AudioImageProvider.GetAudioImagePath` names the extracted file
+   `MD5(Album + "-" + AlbumArtists[0]).jpg` under `CachePath/extracted-audio-images`. Every track of
+   one album resolves to a **single** cache file. That is a deliberate deduplication.
+2. `ItemImageProvider` (line ~241) hands that path to `ProviderManager.SaveImage`.
+3. `ImageSaver.SaveImage` opens with
+   `saveLocally = item.SupportsLocalMetadata && item.IsSaveLocalMetadataEnabled() && !item.ExtraType.HasValue && item is not Audio`.
+   For a track that is **always false**, so it always falls through to
+   `Path.Combine(item.GetInternalMetadataPath(), ...)`.
+
+So the one cache file is copied into every track's own metadata folder. A fifteen-track album stores
+the same cover fifteen times. On a 223 000-track library that is tens of gigabytes.
+
+Two consequences worth knowing:
+
+- **"Save artwork into media folders" cannot affect music tracks.** The `item is not Audio` test
+  short-circuits before the setting is read. An admin changing it is changing nothing.
+- `DeleteCacheFileTask` deletes everything under `CachePath` whose **last write time** is older than
+  30 days, every 24 h. The extracted cache file is written once, so it is purged a month later
+  whatever its use, and re-extracted by ffmpeg on next display. The copies in the metadata folder are
+  not touched by that task.
+
+### What the audit is allowed to count
+
+Only images whose path is under `IServerApplicationPaths.InternalMetadataPath`. A cover the
+administrator put next to their music is **their** file; counting it would put bytes into a figure
+whose whole purpose is to say what could be deleted. There is a test for this and it is the most
+important one in the module.
+
+Two covers are treated as the same image when byte length **and both dimensions** match, grouped per
+containing folder rather than per album so two discs with genuinely different art are never merged.
+Hashing tens of gigabytes nightly to confirm what step 1 above already guarantees would cost more
+than the answer is worth.
+
 ## Still open
 
 The duplicate-album detector is not built, and it is blocked on a product decision rather than on
@@ -59,3 +96,20 @@ code: MusicBrainz separates the **release group** (the album as a work) from the
 object published). Which one "duplicate" means has to be chosen up front, because getting it wrong
 produces hundreds of false positives on a complete discography and destroys the admin's trust on
 the first screen they ever see.
+
+## Measured and abandoned
+
+Three detectors were designed, measured against a real 16 309-artist / 40 364-album / 223 412-track
+library, and dropped. Do not rebuild them without new evidence.
+
+- **Fragmented artists.** 117 groups of names that normalise identically, 0.7% of the artists. Every
+  one of them returns the *same album ids* from both entities: the content is already unified, the
+  duplicate exists only in the artist list. Two mechanisms in the server make such pairs impossible
+  to create today -- `GetAllArtistNames` does `GroupBy(CleanValue).Select(g => g.Min(Value))`, and
+  `MusicArtist.GetPath` does `.TrimEnd('.')` so `Alice` and `Alice.` share a path and therefore a
+  GUID. They are legacy rows from an older version.
+- **Inverted duos and "Nom, Prenom".** One case in 16 309 for the first, zero for the second. The
+  comma is a **genre** delimiter in Jellyfin and never an artist one (`_genreDelimiters` includes
+  it, `_nameDelimiters` does not), so composite artist names are the intended behaviour.
+- **Split albums.** 57% of albums hold exactly one track, and a sample of 300 found **none** sharing
+  a folder with another: the library really is one release per folder. Nothing is split.

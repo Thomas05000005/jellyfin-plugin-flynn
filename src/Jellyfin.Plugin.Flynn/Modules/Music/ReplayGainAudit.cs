@@ -161,10 +161,7 @@ public sealed class ReplayGainAudit
     /// </para>
     /// </summary>
     /// <returns>The music libraries.</returns>
-    internal IReadOnlyList<BaseItem> MusicLibraries() =>
-        [.. _library
-            .GetItemList(new InternalItemsQuery { IncludeItemTypes = [BaseItemKind.CollectionFolder] })
-            .Where(folder => _library.GetContentType(folder) == CollectionType.music)];
+    internal IReadOnlyList<BaseItem> MusicLibraries() => Music.MusicLibraries.Of(_library);
 
     /// <summary>Reads whether the server's loudness scan is switched on for a library.</summary>
     /// <param name="library">The library.</param>

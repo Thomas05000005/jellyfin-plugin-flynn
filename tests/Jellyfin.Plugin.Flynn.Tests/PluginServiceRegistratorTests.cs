@@ -119,6 +119,12 @@ public class PluginServiceRegistratorTests
         // dependency on Jellyfin should show up here as a deliberate line rather than as a
         // mysterious red.
         collection.AddSingleton(Substitute.For<ILibraryManager>());
+
+        // Taken for the cover art audit: where the server keeps its own metadata, and the size of
+        // each file it put there.
+        collection.AddSingleton(Substitute.For<MediaBrowser.Controller.IServerApplicationPaths>());
+        collection.AddSingleton(Substitute.For<MediaBrowser.Model.IO.IFileSystem>());
+
         collection.AddSingleton<ILoggerFactory>(NullLoggerFactory.Instance);
         collection.AddSingleton(typeof(ILogger<>), typeof(NullLogger<>));
 

@@ -104,4 +104,87 @@ public sealed class MusicRepository
             ? DateTimeOffset.Parse(text, CultureInfo.InvariantCulture)
             : null;
     }
+
+    /// <summary>Stores one cover-art audit run.</summary>
+    /// <param name="takenAt">When it ran.</param>
+    /// <param name="libraries">What each music library's stored covers cost.</param>
+    /// <param name="cancellationToken">Cancellation token.</param>
+    /// <returns>A task that completes once the rows are written.</returns>
+    public async Task SaveImagesAsync(
+        DateTimeOffset takenAt,
+        IReadOnlyList<LibraryTrackImages> libraries,
+        CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(libraries);
+
+        await using var connection = await _database.OpenAsync(cancellationToken).ConfigureAwait(false);
+        await using var transaction = await connection.BeginTransactionAsync(cancellationToken)
+            .ConfigureAwait(false);
+
+        foreach (var library in libraries)
+        {
+            await using var command = connection.CreateCommand();
+            command.Transaction = (Microsoft.Data.Sqlite.SqliteTransaction)transaction;
+            command.CommandText =
+                "INSERT OR REPLACE INTO music_images_snapshot "
+                + "(taken_at, library_id, library_name, tracks_with_image, total_bytes, "
+                + "redundant_images, redundant_bytes) "
+                + "VALUES ($at, $id, $name, $tracks, $total, $copies, $copyBytes)";
+            command.Parameters.AddWithValue("$at", takenAt.ToString("O", CultureInfo.InvariantCulture));
+            command.Parameters.AddWithValue("$id", library.LibraryId.ToString("N"));
+            command.Parameters.AddWithValue("$name", library.LibraryName);
+            command.Parameters.AddWithValue("$tracks", library.TracksWithImage);
+            command.Parameters.AddWithValue("$total", library.TotalBytes);
+            command.Parameters.AddWithValue("$copies", library.RedundantImages);
+            command.Parameters.AddWithValue("$copyBytes", library.RedundantBytes);
+            await command.ExecuteNonQueryAsync(cancellationToken).ConfigureAwait(false);
+        }
+
+        await transaction.CommitAsync(cancellationToken).ConfigureAwait(false);
+    }
+
+    /// <summary>Reads the most recent cover-art audit.</summary>
+    /// <param name="cancellationToken">Cancellation token.</param>
+    /// <returns>One entry per library, or empty when nothing has run.</returns>
+    public async Task<IReadOnlyList<LibraryTrackImages>> GetLatestImagesAsync(
+        CancellationToken cancellationToken)
+    {
+        await using var connection = await _database.OpenAsync(cancellationToken).ConfigureAwait(false);
+        await using var read = connection.CreateCommand();
+        read.CommandText =
+            "SELECT library_id, library_name, tracks_with_image, total_bytes, redundant_images, "
+            + "redundant_bytes FROM music_images_snapshot "
+            + "WHERE taken_at = (SELECT MAX(taken_at) FROM music_images_snapshot) "
+            + "ORDER BY library_name";
+
+        var results = new List<LibraryTrackImages>();
+        await using var rows = await read.ExecuteReaderAsync(cancellationToken).ConfigureAwait(false);
+        while (await rows.ReadAsync(cancellationToken).ConfigureAwait(false))
+        {
+            results.Add(new LibraryTrackImages(
+                Guid.ParseExact(rows.GetString(0), "N"),
+                rows.GetString(1),
+                rows.GetInt32(2),
+                rows.GetInt64(3),
+                rows.GetInt32(4),
+                rows.GetInt64(5)));
+        }
+
+        return results;
+    }
+
+    /// <summary>When the most recent cover-art audit ran.</summary>
+    /// <param name="cancellationToken">Cancellation token.</param>
+    /// <returns>The time, or null when nothing has run.</returns>
+    public async Task<DateTimeOffset?> GetLatestImagesTimeAsync(CancellationToken cancellationToken)
+    {
+        await using var connection = await _database.OpenAsync(cancellationToken).ConfigureAwait(false);
+        await using var read = connection.CreateCommand();
+        read.CommandText = "SELECT MAX(taken_at) FROM music_images_snapshot";
+
+        var value = await read.ExecuteScalarAsync(cancellationToken).ConfigureAwait(false);
+        return value is string text
+            ? DateTimeOffset.Parse(text, CultureInfo.InvariantCulture)
+            : null;
+    }
 }

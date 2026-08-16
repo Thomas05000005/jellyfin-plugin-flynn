@@ -102,21 +102,5 @@ public sealed class StorageModule : IFlynnModule
     /// The scaled value, already rounded for display, and the translation KEY for its unit. One decimal from GB upward and
     /// none below: "512.0 MB" reads worse than "512 MB", while "4 TB" hides hundreds of gigabytes.
     /// </returns>
-    internal static (double Value, string UnitKey) ScaleBytes(long bytes)
-    {
-        if (bytes <= 0)
-        {
-            return (0, StringKeys.UnitBytes);
-        }
-
-        string[] unitKeys =
-        [
-            StringKeys.UnitBytes, StringKeys.UnitKilobytes, StringKeys.UnitMegabytes,
-            StringKeys.UnitGigabytes, StringKeys.UnitTerabytes, StringKeys.UnitPetabytes,
-        ];
-        var order = Math.Min((int)Math.Floor(Math.Log(bytes, 1024)), unitKeys.Length - 1);
-        var size = bytes / Math.Pow(1024, order);
-
-        return (Math.Round(size, order >= 3 ? 1 : 0), unitKeys[order]);
-    }
+    internal static (double Value, string UnitKey) ScaleBytes(long bytes) => ByteScale.Of(bytes);
 }

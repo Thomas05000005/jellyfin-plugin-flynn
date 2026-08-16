@@ -103,6 +103,25 @@ public static class StringKeys
     /// <summary>Issue detail: <c>issue.loudness.detail</c>.</summary>
     public const string IssueLoudnessDetail = "issue.loudness.detail";
 
+    /// <summary>Cover-art module name: <c>music-images.name</c>.</summary>
+    public const string MusicImagesName = "music-images.name";
+    /// <summary>Cover-art module summary: <c>music-images.summary</c>.</summary>
+    public const string MusicImagesSummary = "music-images.summary";
+    /// <summary>Before the first cover-art audit: <c>music-images.no-audit</c>.</summary>
+    public const string MusicImagesNoAudit = "music-images.no-audit";
+    /// <summary>No cover stored by the server at all: <c>music-images.none</c>.</summary>
+    public const string MusicImagesNone = "music-images.none";
+    /// <summary>Reclaimable cover art: <c>music-images.headline</c>.</summary>
+    public const string MusicImagesHeadline = "music-images.headline";
+    /// <summary>Why the copies exist: <c>music-images.detail</c>.</summary>
+    public const string MusicImagesDetail = "music-images.detail";
+    /// <summary>Nothing is duplicated: <c>music-images.clean</c>.</summary>
+    public const string MusicImagesClean = "music-images.clean";
+    /// <summary>Issue title: <c>issue.track-images</c>.</summary>
+    public const string IssueTrackImages = "issue.track-images";
+    /// <summary>Issue detail: <c>issue.track-images.detail</c>.</summary>
+    public const string IssueTrackImagesDetail = "issue.track-images.detail";
+
     /// <summary>Admin page chrome: <c>ui.toggle-failed</c>.</summary>
     public const string UiToggleFailed = "ui.toggle-failed";
     /// <summary>Issue state, for a row that is not in the inbox: <c>ui.state.snoozed</c>.</summary>
@@ -235,6 +254,15 @@ public static class StringKeys
         IssueLoudnessScanOff,
         IssueLoudnessIncomplete,
         IssueLoudnessDetail,
+        MusicImagesName,
+        MusicImagesSummary,
+        MusicImagesNoAudit,
+        MusicImagesNone,
+        MusicImagesHeadline,
+        MusicImagesDetail,
+        MusicImagesClean,
+        IssueTrackImages,
+        IssueTrackImagesDetail,
         UiWithheldResolved,
         UiToggleFailed,
         UiStateSnoozed,

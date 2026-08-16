@@ -17,8 +17,10 @@ namespace Jellyfin.Plugin.Flynn.Modules.Music;
 public sealed class MusicAuditTask : IScheduledTask, IConfigurableScheduledTask
 {
     private readonly ReplayGainAudit _loudness;
+    private readonly TrackImageAudit _images;
     private readonly MusicRepository _repository;
     private readonly MusicModule _module;
+    private readonly TrackImagesModule _imagesModule;
     private readonly IssueRegistry _issues;
     private readonly DatabaseReadiness _readiness;
     private readonly TimeProvider _clock;
@@ -26,24 +28,30 @@ public sealed class MusicAuditTask : IScheduledTask, IConfigurableScheduledTask
 
     /// <summary>Initializes a new instance of the <see cref="MusicAuditTask"/> class.</summary>
     /// <param name="loudness">The loudness audit.</param>
+    /// <param name="images">The stored cover art audit.</param>
     /// <param name="repository">Where the result is stored.</param>
-    /// <param name="module">Turns the result into issues.</param>
+    /// <param name="module">Turns the loudness result into issues.</param>
+    /// <param name="imagesModule">Turns the cover art result into issues.</param>
     /// <param name="issues">The issue registry.</param>
     /// <param name="readiness">Whether Flynn's database is available.</param>
     /// <param name="clock">Time source.</param>
     /// <param name="logger">Logger.</param>
     public MusicAuditTask(
         ReplayGainAudit loudness,
+        TrackImageAudit images,
         MusicRepository repository,
         MusicModule module,
+        TrackImagesModule imagesModule,
         IssueRegistry issues,
         DatabaseReadiness readiness,
         TimeProvider clock,
         ILogger<MusicAuditTask> logger)
     {
         _loudness = loudness;
+        _images = images;
         _repository = repository;
         _module = module;
+        _imagesModule = imagesModule;
         _issues = issues;
         _readiness = readiness;
         _clock = clock;
@@ -58,8 +66,8 @@ public sealed class MusicAuditTask : IScheduledTask, IConfigurableScheduledTask
 
     /// <inheritdoc />
     public string Description =>
-        "Counts how much of the music library has a usable loudness value, and says why the rest "
-        + "does not. Reads only.";
+        "Counts how much of the music library has a usable loudness value and says why the rest "
+        + "does not, and measures what per-track cover art costs on disk. Reads only.";
 
     /// <inheritdoc />
     public string Category => "Flynn";
@@ -101,7 +109,7 @@ public sealed class MusicAuditTask : IScheduledTask, IConfigurableScheduledTask
         }
 
         var libraries = _loudness.Run(cancellationToken);
-        progress.Report(80);
+        progress.Report(45);
 
         await _repository.SaveLoudnessAsync(_clock.GetUtcNow(), libraries, cancellationToken)
             .ConfigureAwait(false);
@@ -120,6 +128,26 @@ public sealed class MusicAuditTask : IScheduledTask, IConfigurableScheduledTask
         }
 
         await _module.ReportIssuesAsync(_issues, cancellationToken).ConfigureAwait(false);
+
+        var covers = _images.Run(cancellationToken);
+        progress.Report(90);
+
+        await _repository.SaveImagesAsync(_clock.GetUtcNow(), covers, cancellationToken)
+            .ConfigureAwait(false);
+
+        foreach (var library in covers)
+        {
+            _logger.LogInformation(
+                "{Library}: {Count} track covers stored by the server, {Bytes} bytes, of which "
+                + "{Copies} are copies worth {CopyBytes} bytes.",
+                library.LibraryName,
+                library.TracksWithImage,
+                library.TotalBytes,
+                library.RedundantImages,
+                library.RedundantBytes);
+        }
+
+        await _imagesModule.ReportIssuesAsync(_issues, cancellationToken).ConfigureAwait(false);
         progress.Report(100);
     }
 }

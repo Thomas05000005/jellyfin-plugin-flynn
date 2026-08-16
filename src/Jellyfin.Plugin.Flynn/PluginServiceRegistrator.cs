@@ -84,6 +84,9 @@ public sealed class PluginServiceRegistrator : IPluginServiceRegistrator
         // because the nightly task and the dashboard have to be looking at the same object.
         serviceCollection.AddSingleton<MusicModule>();
         serviceCollection.AddSingleton<IFlynnModule>(s => s.GetRequiredService<MusicModule>());
+        serviceCollection.AddSingleton<TrackImageAudit>();
+        serviceCollection.AddSingleton<TrackImagesModule>();
+        serviceCollection.AddSingleton<IFlynnModule>(s => s.GetRequiredService<TrackImagesModule>());
         serviceCollection.AddSingleton<IScheduledTask, MusicAuditTask>();
 
         // An IStartupFilter is all it takes for ASP.NET Core to wrap the pipeline; the

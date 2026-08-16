@@ -111,5 +111,24 @@ public static class Migrations
             CREATE INDEX ix_music_loudness_library
                 ON music_loudness_snapshot (library_id, taken_at);
             """),
+
+        new Migration(
+            6,
+            "per-track cover art snapshots",
+            """
+            CREATE TABLE music_images_snapshot (
+                taken_at          TEXT    NOT NULL,
+                library_id        TEXT    NOT NULL,
+                library_name      TEXT    NOT NULL,
+                tracks_with_image INTEGER NOT NULL,
+                total_bytes       INTEGER NOT NULL,
+                redundant_images  INTEGER NOT NULL,
+                redundant_bytes   INTEGER NOT NULL,
+                PRIMARY KEY (taken_at, library_id)
+            );
+
+            CREATE INDEX ix_music_images_library
+                ON music_images_snapshot (library_id, taken_at);
+            """),
     ];
 }

@@ -103,7 +103,12 @@ resolves `MutationKernel`, and `MaxWriteLevel` is read by nothing. Nothing write
 below currently holds trivially. Wiring it is the step before the Music module, which is the first
 thing that will write.
 
-Next: the write kernel, then Music (album duplicates, split multi-disc, ReplayGain audit) read-only
-first.
+Music ships two modules, both read-only: **loudness coverage** and **stored cover art**. The second
+measures what per-track covers cost on the server's own disk and how much of it is the same image
+stored once per track — see `Modules/Music/CLAUDE.md` for the three server steps that cause it, and
+for the three detectors that were measured against a real library and abandoned.
+
+Next: the write kernel, so the reclaimable cover art can actually be reclaimed with a preview and an
+undo. Album duplicates remain blocked on the release-group question.
 
 Design and decisions: `docs/ARCHITECTURE.md`. Releasing: `docs/RELEASING.md`.
