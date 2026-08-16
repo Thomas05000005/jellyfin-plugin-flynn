@@ -4,6 +4,20 @@ using Jellyfin.Plugin.Flynn.Core.Data;
 namespace Jellyfin.Plugin.Flynn.Modules.Music;
 
 /// <summary>
+/// One audit run, with the moment it was taken.
+/// <para>
+/// The timestamp travels with the rows rather than being fetched separately, and that is a
+/// correctness point rather than tidiness: two queries each evaluating their own
+/// <c>SELECT MAX(taken_at)</c> are two transactions, so a run finishing between them would put one
+/// night's figures under another night's date. Read together, they cannot disagree.
+/// </para>
+/// </summary>
+/// <typeparam name="T">What the audit found for one library.</typeparam>
+/// <param name="TakenAt">When the run happened, or null when nothing has ever run.</param>
+/// <param name="Libraries">One entry per music library.</param>
+public sealed record MusicSnapshot<T>(DateTimeOffset? TakenAt, IReadOnlyList<T> Libraries);
+
+/// <summary>
 /// Stores what the nightly music audit found, so the page reads one row instead of walking the
 /// library.
 /// <para>
@@ -23,7 +37,7 @@ public sealed class MusicRepository
         _database = database ?? throw new ArgumentNullException(nameof(database));
     }
 
-    /// <summary>Stores one audit run.</summary>
+    /// <summary>Stores one loudness audit run.</summary>
     /// <param name="takenAt">When it ran.</param>
     /// <param name="libraries">What each music library holds.</param>
     /// <param name="cancellationToken">Cancellation token.</param>
@@ -47,7 +61,7 @@ public sealed class MusicRepository
                 "INSERT OR REPLACE INTO music_loudness_snapshot "
                 + "(taken_at, library_id, library_name, scan_enabled, tracks, from_tag, measured) "
                 + "VALUES ($at, $id, $name, $scan, $tracks, $tag, $measured)";
-            command.Parameters.AddWithValue("$at", takenAt.ToString("O", CultureInfo.InvariantCulture));
+            command.Parameters.AddWithValue("$at", Stamp(takenAt));
             command.Parameters.AddWithValue("$id", library.LibraryId.ToString("N"));
             command.Parameters.AddWithValue("$name", library.LibraryName);
             command.Parameters.AddWithValue("$scan", library.ScanEnabled ? 1 : 0);
@@ -60,49 +74,36 @@ public sealed class MusicRepository
         await transaction.CommitAsync(cancellationToken).ConfigureAwait(false);
     }
 
-    /// <summary>Reads the most recent audit.</summary>
+    /// <summary>Reads the most recent loudness audit, with the moment it was taken.</summary>
     /// <param name="cancellationToken">Cancellation token.</param>
     /// <returns>One entry per library, or empty when nothing has run.</returns>
-    public async Task<IReadOnlyList<LibraryLoudness>> GetLatestLoudnessAsync(
+    public async Task<MusicSnapshot<LibraryLoudness>> GetLatestLoudnessAsync(
         CancellationToken cancellationToken)
     {
         await using var connection = await _database.OpenAsync(cancellationToken).ConfigureAwait(false);
         await using var read = connection.CreateCommand();
         read.CommandText =
-            "SELECT library_id, library_name, scan_enabled, tracks, from_tag, measured "
+            "SELECT taken_at, library_id, library_name, scan_enabled, tracks, from_tag, measured "
             + "FROM music_loudness_snapshot "
             + "WHERE taken_at = (SELECT MAX(taken_at) FROM music_loudness_snapshot) "
             + "ORDER BY library_name";
 
+        DateTimeOffset? takenAt = null;
         var results = new List<LibraryLoudness>();
         await using var rows = await read.ExecuteReaderAsync(cancellationToken).ConfigureAwait(false);
         while (await rows.ReadAsync(cancellationToken).ConfigureAwait(false))
         {
+            takenAt ??= DateTimeOffset.Parse(rows.GetString(0), CultureInfo.InvariantCulture);
             results.Add(new LibraryLoudness(
-                Guid.ParseExact(rows.GetString(0), "N"),
-                rows.GetString(1),
-                rows.GetInt32(2) != 0,
-                rows.GetInt32(3),
+                Guid.ParseExact(rows.GetString(1), "N"),
+                rows.GetString(2),
+                rows.GetInt32(3) != 0,
                 rows.GetInt32(4),
-                rows.GetInt32(5)));
+                rows.GetInt32(5),
+                rows.GetInt32(6)));
         }
 
-        return results;
-    }
-
-    /// <summary>When the most recent audit ran.</summary>
-    /// <param name="cancellationToken">Cancellation token.</param>
-    /// <returns>The time, or null when nothing has run.</returns>
-    public async Task<DateTimeOffset?> GetLatestLoudnessTimeAsync(CancellationToken cancellationToken)
-    {
-        await using var connection = await _database.OpenAsync(cancellationToken).ConfigureAwait(false);
-        await using var read = connection.CreateCommand();
-        read.CommandText = "SELECT MAX(taken_at) FROM music_loudness_snapshot";
-
-        var value = await read.ExecuteScalarAsync(cancellationToken).ConfigureAwait(false);
-        return value is string text
-            ? DateTimeOffset.Parse(text, CultureInfo.InvariantCulture)
-            : null;
+        return new MusicSnapshot<LibraryLoudness>(takenAt, results);
     }
 
     /// <summary>Stores one cover-art audit run.</summary>
@@ -130,7 +131,7 @@ public sealed class MusicRepository
                 + "(taken_at, library_id, library_name, tracks_with_image, total_bytes, "
                 + "redundant_images, redundant_bytes) "
                 + "VALUES ($at, $id, $name, $tracks, $total, $copies, $copyBytes)";
-            command.Parameters.AddWithValue("$at", takenAt.ToString("O", CultureInfo.InvariantCulture));
+            command.Parameters.AddWithValue("$at", Stamp(takenAt));
             command.Parameters.AddWithValue("$id", library.LibraryId.ToString("N"));
             command.Parameters.AddWithValue("$name", library.LibraryName);
             command.Parameters.AddWithValue("$tracks", library.TracksWithImage);
@@ -143,48 +144,49 @@ public sealed class MusicRepository
         await transaction.CommitAsync(cancellationToken).ConfigureAwait(false);
     }
 
-    /// <summary>Reads the most recent cover-art audit.</summary>
+    /// <summary>Reads the most recent cover-art audit, with the moment it was taken.</summary>
     /// <param name="cancellationToken">Cancellation token.</param>
     /// <returns>One entry per library, or empty when nothing has run.</returns>
-    public async Task<IReadOnlyList<LibraryTrackImages>> GetLatestImagesAsync(
+    public async Task<MusicSnapshot<LibraryTrackImages>> GetLatestImagesAsync(
         CancellationToken cancellationToken)
     {
         await using var connection = await _database.OpenAsync(cancellationToken).ConfigureAwait(false);
         await using var read = connection.CreateCommand();
         read.CommandText =
-            "SELECT library_id, library_name, tracks_with_image, total_bytes, redundant_images, "
-            + "redundant_bytes FROM music_images_snapshot "
+            "SELECT taken_at, library_id, library_name, tracks_with_image, total_bytes, "
+            + "redundant_images, redundant_bytes FROM music_images_snapshot "
             + "WHERE taken_at = (SELECT MAX(taken_at) FROM music_images_snapshot) "
             + "ORDER BY library_name";
 
+        DateTimeOffset? takenAt = null;
         var results = new List<LibraryTrackImages>();
         await using var rows = await read.ExecuteReaderAsync(cancellationToken).ConfigureAwait(false);
         while (await rows.ReadAsync(cancellationToken).ConfigureAwait(false))
         {
+            takenAt ??= DateTimeOffset.Parse(rows.GetString(0), CultureInfo.InvariantCulture);
             results.Add(new LibraryTrackImages(
-                Guid.ParseExact(rows.GetString(0), "N"),
-                rows.GetString(1),
-                rows.GetInt32(2),
-                rows.GetInt64(3),
-                rows.GetInt32(4),
-                rows.GetInt64(5)));
+                Guid.ParseExact(rows.GetString(1), "N"),
+                rows.GetString(2),
+                rows.GetInt32(3),
+                rows.GetInt64(4),
+                rows.GetInt32(5),
+                rows.GetInt64(6)));
         }
 
-        return results;
+        return new MusicSnapshot<LibraryTrackImages>(takenAt, results);
     }
 
-    /// <summary>When the most recent cover-art audit ran.</summary>
-    /// <param name="cancellationToken">Cancellation token.</param>
-    /// <returns>The time, or null when nothing has run.</returns>
-    public async Task<DateTimeOffset?> GetLatestImagesTimeAsync(CancellationToken cancellationToken)
-    {
-        await using var connection = await _database.OpenAsync(cancellationToken).ConfigureAwait(false);
-        await using var read = connection.CreateCommand();
-        read.CommandText = "SELECT MAX(taken_at) FROM music_images_snapshot";
-
-        var value = await read.ExecuteScalarAsync(cancellationToken).ConfigureAwait(false);
-        return value is string text
-            ? DateTimeOffset.Parse(text, CultureInfo.InvariantCulture)
-            : null;
-    }
+    /// <summary>
+    /// Formats the moment a run happened.
+    /// <para>
+    /// Converted to UTC first, because <c>MAX(taken_at)</c> compares TEXT lexicographically and
+    /// that only orders correctly while every writer produces the same offset. A caller passing a
+    /// local <see cref="DateTimeOffset"/> would otherwise be able to write a row that sorts before
+    /// an older one, and the card would quietly show the wrong night.
+    /// </para>
+    /// </summary>
+    /// <param name="takenAt">When the run happened.</param>
+    /// <returns>A round-trip UTC stamp.</returns>
+    private static string Stamp(DateTimeOffset takenAt) =>
+        takenAt.ToUniversalTime().ToString("O", CultureInfo.InvariantCulture);
 }

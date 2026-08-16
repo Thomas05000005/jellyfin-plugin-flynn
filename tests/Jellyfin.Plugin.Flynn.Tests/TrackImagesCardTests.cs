@@ -105,10 +105,89 @@ public sealed class TrackImagesCardTests
         await fixture.SaveAsync(
             new LibraryTrackImages(Guid.NewGuid(), "Musiques", 223_412, huge, 183_000, huge - Gigabyte));
 
-        var read = Assert.Single(await fixture.Repository.GetLatestImagesAsync(CancellationToken.None));
+        var snapshot = await fixture.Repository.GetLatestImagesAsync(CancellationToken.None);
+        var read = Assert.Single(snapshot.Libraries);
 
         Assert.Equal(huge, read.TotalBytes);
         Assert.Equal(huge - Gigabyte, read.RedundantBytes);
+
+        // The timestamp comes back with the rows, from the same query, so the card can never date
+        // one night's figures with another night's stamp.
+        Assert.NotNull(snapshot.TakenAt);
+        Assert.Equal(TimeSpan.Zero, snapshot.TakenAt!.Value.Offset);
+    }
+
+    /// <summary>
+    /// MAX(taken_at) compares TEXT, so ordering only holds while every writer produces the same
+    /// offset. A caller passing a local DateTimeOffset must not be able to write a row that sorts
+    /// above a genuinely later one.
+    /// </summary>
+    [Fact]
+    public async Task ARunStampedInAnotherOffset_DoesNotOvertakeALaterRun()
+    {
+        await using var fixture = await Fixture.CreateAsync();
+        var later = new DateTimeOffset(2026, 1, 1, 0, 0, 0, TimeSpan.Zero);
+
+        // Reads as 01:00 but is 20:00 the previous day. Lexicographically it beats the line above.
+        var earlier = new DateTimeOffset(2026, 1, 1, 1, 0, 0, TimeSpan.FromHours(5));
+        Assert.True(earlier.ToUniversalTime() < later);
+
+        await fixture.Repository.SaveImagesAsync(
+            later,
+            [new LibraryTrackImages(Guid.NewGuid(), "le bon", 1, 10, 0, 0)],
+            CancellationToken.None);
+        await fixture.Repository.SaveImagesAsync(
+            earlier,
+            [new LibraryTrackImages(Guid.NewGuid(), "le vieux", 1, 20, 0, 0)],
+            CancellationToken.None);
+
+        var snapshot = await fixture.Repository.GetLatestImagesAsync(CancellationToken.None);
+
+        Assert.Equal("le bon", Assert.Single(snapshot.Libraries).LibraryName);
+    }
+
+    [Fact]
+    public async Task RetentionPrunesOldMusicRuns_ButNeverTheNewest()
+    {
+        await using var fixture = await Fixture.CreateAsync();
+        var now = new DateTimeOffset(2026, 8, 16, 4, 15, 0, TimeSpan.Zero);
+
+        await fixture.Repository.SaveImagesAsync(
+            now - TimeSpan.FromDays(400),
+            [new LibraryTrackImages(Guid.NewGuid(), "vieux", 1, 10, 0, 0)],
+            CancellationToken.None);
+        await fixture.Repository.SaveImagesAsync(
+            now - TimeSpan.FromDays(10),
+            [new LibraryTrackImages(Guid.NewGuid(), "recent", 1, 20, 0, 0)],
+            CancellationToken.None);
+
+        var outcome = await fixture.RetentionAt(now).RunAsync(CancellationToken.None);
+
+        Assert.Equal(1, outcome.MusicSnapshotRows);
+        Assert.Equal("recent", Assert.Single(
+            (await fixture.Repository.GetLatestImagesAsync(CancellationToken.None)).Libraries)
+            .LibraryName);
+    }
+
+    /// <summary>
+    /// A server whose music audit has not run for over a year still has a card. The cleanup must
+    /// not be what empties it.
+    /// </summary>
+    [Fact]
+    public async Task TheOnlyRunIsKeptEvenWhenItIsOlderThanTheWindow()
+    {
+        await using var fixture = await Fixture.CreateAsync();
+        var now = new DateTimeOffset(2026, 8, 16, 4, 15, 0, TimeSpan.Zero);
+
+        await fixture.Repository.SaveImagesAsync(
+            now - TimeSpan.FromDays(900),
+            [new LibraryTrackImages(Guid.NewGuid(), "ancien", 1, 10, 0, 0)],
+            CancellationToken.None);
+
+        var outcome = await fixture.RetentionAt(now).RunAsync(CancellationToken.None);
+
+        Assert.Equal(0, outcome.MusicSnapshotRows);
+        Assert.NotEmpty((await fixture.Repository.GetLatestImagesAsync(CancellationToken.None)).Libraries);
     }
 
     [Fact]
@@ -160,6 +239,9 @@ public sealed class TrackImagesCardTests
 
         public Task SaveAsync(params LibraryTrackImages[] libraries) =>
             Repository.SaveImagesAsync(DateTimeOffset.UtcNow, libraries, CancellationToken.None);
+
+        public Retention RetentionAt(DateTimeOffset now) =>
+            new(_database, new FakeClock(now), NullLogger<Retention>.Instance);
 
         public ValueTask DisposeAsync()
         {

@@ -196,19 +196,26 @@ public sealed class TrackImageAudit
 
         // MusicAlbum carries RequiresSourceSerialisation, so albums come back without a JSON parse
         // per row. Audio does not, which is why tracks are touched once and only once.
-        var albums = _library.GetItemList(new InternalItemsQuery
-        {
-            ParentId = libraryId,
-            IncludeItemTypes = [BaseItemKind.MusicAlbum],
-            Recursive = true,
-        });
+        //
+        // The ids are materialised and the entities dropped immediately. Chunking a lazy Select
+        // over the list would keep it rooted for the whole walk, and forty thousand album entities
+        // held from the first batch to the last is tens of megabytes retained to read a Guid.
+        var albumIds = _library
+            .GetItemList(new InternalItemsQuery
+            {
+                ParentId = libraryId,
+                IncludeItemTypes = [BaseItemKind.MusicAlbum],
+                Recursive = true,
+            })
+            .Select(album => album.Id)
+            .ToArray();
 
         var count = 0;
         var bytes = 0L;
         var redundant = 0;
         var redundantBytes = 0L;
 
-        foreach (var batch in albums.Select(album => album.Id).Chunk(AlbumBatchSize))
+        foreach (var batch in albumIds.Chunk(AlbumBatchSize))
         {
             cancellationToken.ThrowIfCancellationRequested();
 
@@ -223,6 +230,12 @@ public sealed class TrackImageAudit
                 IncludeItemTypes = [BaseItemKind.Audio],
             }))
             {
+                // Checked per track, not per batch. This loop is where every filesystem call
+                // happens: two hundred albums is around a thousand tracks and a thousand blocking
+                // stats between two checkpoints, which is long enough that Cancel does nothing and
+                // the task's own runtime limit overshoots.
+                cancellationToken.ThrowIfCancellationRequested();
+
                 var cover = StoredCover(track, metadataRoot);
                 if (cover is null)
                 {

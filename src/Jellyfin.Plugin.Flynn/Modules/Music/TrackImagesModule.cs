@@ -76,8 +76,9 @@ public sealed class TrackImagesModule : IFlynnModule
                 _clock.GetUtcNow());
         }
 
-        var latest = await _repository.GetLatestImagesAsync(cancellationToken).ConfigureAwait(false);
-        var takenAt = await _repository.GetLatestImagesTimeAsync(cancellationToken).ConfigureAwait(false);
+        var snapshot = await _repository.GetLatestImagesAsync(cancellationToken).ConfigureAwait(false);
+        var latest = snapshot.Libraries;
+        var takenAt = snapshot.TakenAt;
 
         if (latest.Count == 0)
         {
@@ -138,7 +139,8 @@ public sealed class TrackImagesModule : IFlynnModule
     {
         ArgumentNullException.ThrowIfNull(issues);
 
-        var latest = await _repository.GetLatestImagesAsync(cancellationToken).ConfigureAwait(false);
+        var latest = (await _repository.GetLatestImagesAsync(cancellationToken).ConfigureAwait(false))
+            .Libraries;
         var found = new List<Issue>();
 
         foreach (var library in latest.Where(l => l.RedundantBytes >= WorthReporting))

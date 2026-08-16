@@ -126,9 +126,6 @@ public static class Migrations
                 redundant_bytes   INTEGER NOT NULL,
                 PRIMARY KEY (taken_at, library_id)
             );
-
-            CREATE INDEX ix_music_images_library
-                ON music_images_snapshot (library_id, taken_at);
             """),
     ];
 }

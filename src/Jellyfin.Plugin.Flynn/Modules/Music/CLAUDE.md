@@ -97,6 +97,17 @@ object published). Which one "duplicate" means has to be chosen up front, becaus
 produces hundreds of false positives on a complete discography and destroys the admin's trust on
 the first screen they ever see.
 
+## Known cost, not yet paid down
+
+`MusicAuditTask` walks the library **twice** a night: `ReplayGainAudit.Run` and
+`TrackImageAudit.Run` each issue the same album query and then the same `AlbumIds` batches. Since
+`Audio` carries no `[RequiresSourceSerialisation]`, every track row costs a JSON deserialisation of
+its data blob — so a 223 000-track library pays roughly 447 000 of them instead of 223 000.
+
+The fix is one walk feeding two collectors. It is deliberately not folded into the release that
+introduced the second audit: it means reshaping two classes covered by some thirty tests, and that
+does not belong in the same commit as a correctness fix.
+
 ## Measured and abandoned
 
 Three detectors were designed, measured against a real 16 309-artist / 40 364-album / 223 412-track

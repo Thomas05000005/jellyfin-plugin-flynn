@@ -32,6 +32,17 @@ public sealed class Retention
     /// </summary>
     public static readonly TimeSpan MutationLog = TimeSpan.FromDays(365);
 
+    /// <summary>
+    /// How long a music audit run is kept.
+    /// <para>
+    /// Unlike the storage readings these ARE pruned, because nothing depends on their depth: every
+    /// query against them takes the single most recent run. A year is kept so that "sixty percent
+    /// covered, down from ninety" remains possible to build later, and so that a couple of rows a
+    /// night cannot grow without bound in the meantime.
+    /// </para>
+    /// </summary>
+    public static readonly TimeSpan MusicSnapshots = TimeSpan.FromDays(365);
+
     private readonly FlynnDatabase _database;
     private readonly TimeProvider _clock;
     private readonly ILogger<Retention> _logger;
@@ -84,15 +95,31 @@ public sealed class Retention
             [("$before", Stamp(now - MutationLog))],
             cancellationToken).ConfigureAwait(false);
 
-        if (issues > 0 || mutations > 0)
+        // Never the newest run, whatever its age. A server whose music audit has not run for over a
+        // year would otherwise have its card emptied by the cleanup rather than by anything real.
+        var before = Stamp(now - MusicSnapshots);
+        var music = 0;
+        foreach (var table in new[] { "music_loudness_snapshot", "music_images_snapshot" })
         {
-            _logger.LogInformation(
-                "Retention removed {Issues} resolved issue(s) and {Mutations} mutation record(s).",
-                issues,
-                mutations);
+            music += await DeleteAsync(
+                connection,
+                $"DELETE FROM {table} WHERE taken_at < $before "
+                + $"AND taken_at <> (SELECT MAX(taken_at) FROM {table})",
+                [("$before", before)],
+                cancellationToken).ConfigureAwait(false);
         }
 
-        return new RetentionOutcome(issues, mutations);
+        if (issues > 0 || mutations > 0 || music > 0)
+        {
+            _logger.LogInformation(
+                "Retention removed {Issues} resolved issue(s), {Mutations} mutation record(s) and "
+                + "{Music} music audit row(s).",
+                issues,
+                mutations,
+                music);
+        }
+
+        return new RetentionOutcome(issues, mutations, music);
     }
 
     private static string Stamp(DateTimeOffset moment) =>
@@ -118,4 +145,6 @@ public sealed class Retention
 /// <summary>What one retention pass removed.</summary>
 /// <param name="ResolvedIssues">Resolved issues deleted.</param>
 /// <param name="MutationRecords">Mutation records deleted.</param>
-public readonly record struct RetentionOutcome(int ResolvedIssues, int MutationRecords);
+/// <param name="MusicSnapshotRows">Music audit rows deleted, across both snapshot tables.</param>
+public readonly record struct RetentionOutcome(
+    int ResolvedIssues, int MutationRecords, int MusicSnapshotRows);

@@ -67,7 +67,8 @@ public sealed class MusicModule : IFlynnModule
                 _clock.GetUtcNow());
         }
 
-        var latest = await _repository.GetLatestLoudnessAsync(cancellationToken).ConfigureAwait(false);
+        var snapshot = await _repository.GetLatestLoudnessAsync(cancellationToken).ConfigureAwait(false);
+        var latest = snapshot.Libraries;
         if (latest.Count == 0)
         {
             return new ModuleCard(
@@ -77,7 +78,7 @@ public sealed class MusicModule : IFlynnModule
 
         var tracks = latest.Sum(l => l.Tracks);
         var covered = latest.Sum(l => l.Covered);
-        var takenAt = await _repository.GetLatestLoudnessTimeAsync(cancellationToken).ConfigureAwait(false);
+        var takenAt = snapshot.TakenAt;
 
         if (tracks == 0)
         {
@@ -140,7 +141,8 @@ public sealed class MusicModule : IFlynnModule
     {
         ArgumentNullException.ThrowIfNull(issues);
 
-        var latest = await _repository.GetLatestLoudnessAsync(cancellationToken).ConfigureAwait(false);
+        var latest = (await _repository.GetLatestLoudnessAsync(cancellationToken).ConfigureAwait(false))
+            .Libraries;
         var found = new List<Issue>();
 
         foreach (var library in latest.Where(l => l.Tracks > 0 && l.Coverage < CoverageToWarn))

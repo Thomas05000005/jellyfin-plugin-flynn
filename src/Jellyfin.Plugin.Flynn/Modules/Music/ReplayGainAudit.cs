@@ -186,18 +186,24 @@ public sealed class ReplayGainAudit
     {
         // MusicAlbum carries RequiresSourceSerialisation, so albums come back without a JSON parse
         // per row. Audio does not, which is the other reason to touch tracks once and only once.
-        var albums = _library.GetItemList(new InternalItemsQuery
-        {
-            ParentId = libraryId,
-            IncludeItemTypes = [BaseItemKind.MusicAlbum],
-            Recursive = true,
-        });
+        //
+        // The ids are materialised and the entities dropped immediately: chunking a lazy Select
+        // over the list would keep every album entity rooted from the first batch to the last.
+        var albumIds = _library
+            .GetItemList(new InternalItemsQuery
+            {
+                ParentId = libraryId,
+                IncludeItemTypes = [BaseItemKind.MusicAlbum],
+                Recursive = true,
+            })
+            .Select(a => a.Id)
+            .ToArray();
 
         var tracks = 0;
         var fromTag = 0;
         var measured = 0;
 
-        foreach (var batch in albums.Select(a => a.Id).Chunk(AlbumBatchSize))
+        foreach (var batch in albumIds.Chunk(AlbumBatchSize))
         {
             cancellationToken.ThrowIfCancellationRequested();
 

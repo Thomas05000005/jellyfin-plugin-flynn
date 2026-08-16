@@ -1,0 +1,10 @@
+Adds a second Music module: what per-track cover art costs on the server's own disk. Jellyfin
+extracts a track's embedded cover into its cache under a name shared by the whole album -- a real
+deduplication -- and then copies that file into every track's own metadata folder, because the test
+that decides where to save it excludes audio outright. A fifteen-track album therefore stores the
+same image fifteen times, and on a large library that is tens of gigabytes. The module counts only
+images the server itself wrote: covers you placed next to your music are never counted and never
+touched. Two images count as copies when their byte length and both dimensions match, grouped per
+folder so two discs with genuinely different art are never merged. Read-only -- it reports what
+could be reclaimed and reclaims nothing. Also of note: the same line of server code means "save
+artwork into media folders" has no effect at all on music tracks. Requires Jellyfin 12.0 or later.
