@@ -243,4 +243,68 @@ public class CapacityForecasterTests
 
     private static List<CapacityReading> Series(int days, Func<int, long> freeAtDay) =>
         [.. Enumerable.Range(0, days).Select(d => new CapacityReading(Day0.AddDays(d), freeAtDay(d)))];
+
+    /// <summary>
+    /// Thomas's real series, fourteen intervals from his own nightly task, three of them short
+    /// because he ran it by hand next to the schedule.
+    /// <para>
+    /// Keeping the short gaps put the answer 27% away from what the nightly readings alone say --
+    /// 971 MB/day against 765, which is "full in 123 days" against 156. The worst offender is a
+    /// 1.4 GB move measured over 3.3 hours, which normalises to eleven gigabytes a day. The median
+    /// survived it and still carried it.
+    /// </para>
+    /// </summary>
+    [Fact]
+    public void ShortIntervalsFromAManualRun_DoNotDragTheRate()
+    {
+        // (hours since the previous reading, megabytes per day that gap implies)
+        (double Hours, double MbPerDay)[] series =
+        [
+            (7.3, -2383), (4.5, 6536), (16.1, 1177), (7.9, 7227), (24.0, 3249),
+            (24.1, 765), (47.9, 676), (48.1, 506), (23.9, 117), (14.4, 181),
+            (9.6, 5230), (15.0, 4996), (5.6, -10412), (3.3, 1592),
+        ];
+
+        var at = DateTimeOffset.Parse("2026-08-05T13:33:00Z", null);
+        var free = 200L * 1024 * 1024 * 1024;
+        var readings = new List<CapacityReading> { new(at, free) };
+        foreach (var (hours, mbPerDay) in series)
+        {
+            at = at.AddHours(hours);
+            free -= (long)(mbPerDay * 1024 * 1024 * (hours / 24));
+            readings.Add(new CapacityReading(at, free));
+        }
+
+        var forecast = CapacityForecaster.Estimate(readings, 218L * 1024 * 1024 * 1024, "ext4");
+        var mbPerDayReported = forecast.DailyChangeBytes / 1024.0 / 1024.0;
+
+        // The median of the eleven gaps of six hours or more is 765 MB/day. The median of all
+        // fourteen is 971. Anything near 971 means the short gaps are still being counted.
+        Assert.Equal(765, mbPerDayReported, 1);
+        Assert.Equal(ForecastVerdict.Filling, forecast.Verdict);
+    }
+
+    /// <summary>
+    /// A server whose task only ever runs by hand still deserves an answer, so the short gaps are
+    /// only discarded when enough long ones remain to do without them.
+    /// </summary>
+    [Fact]
+    public void WithOnlyShortIntervals_TheyAreUsedRatherThanRefusingToAnswer()
+    {
+        var at = DateTimeOffset.Parse("2026-08-05T00:00:00Z", null);
+        var free = 200L * 1024 * 1024 * 1024;
+        var readings = new List<CapacityReading> { new(at, free) };
+        for (var i = 0; i < 20; i++)
+        {
+            at = at.AddHours(2);
+            free -= 100L * 1024 * 1024;
+            readings.Add(new CapacityReading(at, free));
+        }
+
+        var forecast = CapacityForecaster.Estimate(readings, 218L * 1024 * 1024 * 1024, "ext4");
+
+        Assert.Equal(ForecastVerdict.Filling, forecast.Verdict);
+        Assert.True(forecast.DailyChangeBytes > 0);
+    }
+
 }

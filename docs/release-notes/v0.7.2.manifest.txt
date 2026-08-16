@@ -1,0 +1,7 @@
+Stops the capacity forecast counting readings taken minutes apart as if they described a day. The
+task can be run by hand next to its schedule, and normalising a small change over a short gap
+produces an enormous daily rate -- on the server this was written for, a 1.4 GB move measured over
+three hours normalised to eleven gigabytes a day. The median absorbed it and still carried it,
+putting the answer 27 percent away from what the nightly readings alone say. Gaps shorter than six
+hours are now discarded, unless there are too few long ones to do without them, because a server
+whose task only ever runs by hand still deserves an answer. Requires Jellyfin 12.0 or later.

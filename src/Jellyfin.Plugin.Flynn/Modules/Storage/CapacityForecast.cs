@@ -78,6 +78,24 @@ public static class CapacityForecaster
     internal const int HorizonDays = 3650;
 
     /// <summary>
+    /// Shortest gap between two readings that says anything about a daily trend, in days.
+    /// <para>
+    /// Six hours. Below that, dividing by the elapsed time turns ordinary noise into a headline
+    /// rate: a 1.4 GB move measured over three hours reads as eleven gigabytes a day.
+    /// </para>
+    /// </summary>
+    internal const double MinimumInterval = 0.25;
+
+    /// <summary>
+    /// How many long intervals are needed before the short ones can be discarded.
+    /// <para>
+    /// Below this the short gaps are kept, because a noisy answer beats no answer -- and a server
+    /// whose task only ever runs by hand would otherwise never get a forecast at all.
+    /// </para>
+    /// </summary>
+    internal const int MinimumLongIntervals = 5;
+
+    /// <summary>
     /// Estimates when a device runs out of usable room.
     /// </summary>
     /// <param name="readings">Readings for one device, in any order. Duplicated days are tolerated.</param>
@@ -180,7 +198,8 @@ public static class CapacityForecaster
     /// <returns>Bytes consumed per day between consecutive readings.</returns>
     private static List<double> DailyDeltas(IReadOnlyList<CapacityReading> ordered)
     {
-        var deltas = new List<double>(ordered.Count - 1);
+        var all = new List<double>(ordered.Count - 1);
+        var long_ = new List<double>(ordered.Count - 1);
 
         for (var i = 1; i < ordered.Count; i++)
         {
@@ -191,10 +210,21 @@ public static class CapacityForecaster
                 continue;
             }
 
-            deltas.Add((ordered[i - 1].FreeBytes - ordered[i].FreeBytes) / elapsed);
+            var perDay = (ordered[i - 1].FreeBytes - ordered[i].FreeBytes) / elapsed;
+            all.Add(perDay);
+            if (elapsed >= MinimumInterval)
+            {
+                long_.Add(perDay);
+            }
         }
 
-        return deltas;
+        // Short intervals are dropped when there are enough long ones to do without them.
+        // Normalising by elapsed time is right, but it turns a small change over a short gap into
+        // an enormous daily rate: on the server this was written for, a run three hours after the
+        // nightly one produced -10 GB/day from a 1.4 GB move. The median survived it, and still
+        // carried it -- keeping the short gaps put the answer 27% away from what the nightly
+        // readings alone say. That is the difference between "full in 123 days" and "in 156".
+        return long_.Count >= MinimumLongIntervals ? long_ : all;
     }
 
     private static double Median(List<double> values)
