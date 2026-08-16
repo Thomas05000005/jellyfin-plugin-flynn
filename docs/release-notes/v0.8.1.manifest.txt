@@ -1,0 +1,9 @@
+The two music audits now share one pass over the library instead of walking it once each. Audio
+items carry no source-serialisation attribute, so every track row costs a JSON deserialisation of
+its data blob -- on a 223 000-track library that was 447 000 of them a night to answer two
+questions. More to the point, the nightly task never consulted the module toggles at all: a music
+module you had switched off still paid for its own full walk every night to produce a figure you
+would never be shown. It now collects only what is enabled, and when both music modules are off it
+reads nothing whatsoever, not even the list of libraries. Sharing a pass could have cost the two
+audits their independence, so it does not: a collector that fails is dropped from the walk and the
+others finish. Requires Jellyfin 12.0 or later.
