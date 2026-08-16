@@ -7,4 +7,8 @@ images the server itself wrote: covers you placed next to your music are never c
 touched. Two images count as copies when their byte length and both dimensions match, grouped per
 folder so two discs with genuinely different art are never merged. Read-only -- it reports what
 could be reclaimed and reclaims nothing. Also of note: the same line of server code means "save
-artwork into media folders" has no effect at all on music tracks. Requires Jellyfin 12.0 or later.
+artwork into media folders" has no effect at all on music tracks. This version additionally fixes a
+counting error affecting the loudness figures published since 0.7.0: the server's AlbumIds filter
+joins on the album NAME rather than the id and carries no library scope, so two albums sharing a
+name could have their tracks counted twice, and tracks from another music library could be counted
+at all. Both audits now scope the query and count every track once. Requires Jellyfin 12.0 or later.
