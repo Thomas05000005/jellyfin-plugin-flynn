@@ -8,6 +8,14 @@
         "category": "General",
         "versions": [
             {
+                "version": "0.8.1.0",
+                "changelog": "The two music audits now share one pass over the library instead of walking it once each. Audio items carry no source-serialisation attribute, so every track row costs a JSON deserialisation of its data blob -- on a 223 000-track library that was 447 000 of them a night to answer two questions. More to the point, the nightly task never consulted the module toggles at all: a music module you had switched off still paid for its own full walk every night to produce a figure you would never be shown. It now collects only what is enabled, and when both music modules are off it reads nothing whatsoever, not even the list of libraries. Sharing a pass could have cost the two audits their independence, so it does not: a collector that fails is dropped from the walk and the others finish. Requires Jellyfin 12.0 or later.",
+                "targetAbi": "12.0.0.0",
+                "sourceUrl": "https://github.com/Thomas05000005/jellyfin-plugin-flynn/releases/download/v0.8.1/Flynn-v0.8.1.zip",
+                "checksum": "b5b54d10bcbf022e4ba0fc56c4423053",
+                "timestamp": "2026-08-16T17:21:52.0000000Z"
+            },
+            {
                 "version": "0.8.0.0",
                 "changelog": "Adds a second Music module: what per-track cover art costs on the server's own disk. Jellyfin extracts a track's embedded cover into its cache under a name shared by the whole album -- a real deduplication -- and then copies that file into every track's own metadata folder, because the test that decides where to save it excludes audio outright. A fifteen-track album therefore stores the same image fifteen times, and on a large library that is tens of gigabytes. The module counts only images the server itself wrote: covers you placed next to your music are never counted and never touched. Two images count as copies when their byte length and both dimensions match, grouped per folder so two discs with genuinely different art are never merged. Read-only -- it reports what could be reclaimed and reclaims nothing. Also of note: the same line of server code means \"save artwork into media folders\" has no effect at all on music tracks. This version additionally fixes a counting error affecting the loudness figures published since 0.7.0: the server's AlbumIds filter joins on the album NAME rather than the id and carries no library scope, so two albums sharing a name could have their tracks counted twice, and tracks from another music library could be counted at all. Both audits now scope the query and count every track once. Requires Jellyfin 12.0 or later.",
                 "targetAbi": "12.0.0.0",
