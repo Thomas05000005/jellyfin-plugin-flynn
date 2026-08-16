@@ -8,6 +8,14 @@
         "category": "General",
         "versions": [
             {
+                "version": "0.8.0.0",
+                "changelog": "Adds a second Music module: what per-track cover art costs on the server's own disk. Jellyfin extracts a track's embedded cover into its cache under a name shared by the whole album -- a real deduplication -- and then copies that file into every track's own metadata folder, because the test that decides where to save it excludes audio outright. A fifteen-track album therefore stores the same image fifteen times, and on a large library that is tens of gigabytes. The module counts only images the server itself wrote: covers you placed next to your music are never counted and never touched. Two images count as copies when their byte length and both dimensions match, grouped per folder so two discs with genuinely different art are never merged. Read-only -- it reports what could be reclaimed and reclaims nothing. Also of note: the same line of server code means \"save artwork into media folders\" has no effect at all on music tracks. This version additionally fixes a counting error affecting the loudness figures published since 0.7.0: the server's AlbumIds filter joins on the album NAME rather than the id and carries no library scope, so two albums sharing a name could have their tracks counted twice, and tracks from another music library could be counted at all. Both audits now scope the query and count every track once. Requires Jellyfin 12.0 or later.",
+                "targetAbi": "12.0.0.0",
+                "sourceUrl": "https://github.com/Thomas05000005/jellyfin-plugin-flynn/releases/download/v0.8.0/Flynn-v0.8.0.zip",
+                "checksum": "b4695c6d7f1c86be4c70c8b62f0d73cf",
+                "timestamp": "2026-08-16T11:49:47.0000000Z"
+            },
+            {
                 "version": "0.7.2.0",
                 "changelog": "Stops the capacity forecast counting readings taken minutes apart as if they described a day. The task can be run by hand next to its schedule, and normalising a small change over a short gap produces an enormous daily rate -- on the server this was written for, a 1.4 GB move measured over three hours normalised to eleven gigabytes a day. The median absorbed it and still carried it, putting the answer 27 percent away from what the nightly readings alone say. Gaps shorter than six hours are now discarded, unless there are too few long ones to do without them, because a server whose task only ever runs by hand still deserves an answer. Requires Jellyfin 12.0 or later.",
                 "targetAbi": "12.0.0.0",
