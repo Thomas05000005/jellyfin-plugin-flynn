@@ -23,6 +23,7 @@ namespace Jellyfin.Plugin.Flynn.Tests;
 /// wrong, and the second thing it says ignored.
 /// </para>
 /// </summary>
+[Collection(SqliteCollection.Name)]
 public sealed class MusicLoudnessTests
 {
     [Fact]
@@ -227,6 +228,25 @@ public sealed class MusicLoudnessTests
     /// Builds an audit over one music library whose tracks are spread across enough albums to
     /// exercise the batching, since a single-album fixture would never take the loop round twice.
     /// </summary>
+    /// <summary>
+    /// Builds an audit over one music library.
+    /// <para>
+    /// The library manager models the server's real <c>AlbumIds</c> semantics, which is a join on
+    /// the album NAME rather than a filter on the id:
+    /// </para>
+    /// <code>
+    /// var subQuery = context.BaseItems.WhereOneOrMany(filter.AlbumIds, f =&gt; f.Id);
+    /// baseQuery = baseQuery.Where(e =&gt; subQuery.Any(f =&gt; f.Name == e.Album));
+    /// </code>
+    /// <para>
+    /// The earlier version filtered by id AND named every album "album". Faithful to the server,
+    /// that fixture would have every batch return every track in the library -- which is exactly
+    /// the over-counting the audit now guards against, and exactly what the old double could not
+    /// express.
+    /// </para>
+    /// </summary>
+    /// <param name="tracks">The tracks the library holds.</param>
+    /// <returns>An audit over them.</returns>
     private static ReplayGainAudit AuditOver(params Audio[] tracks)
     {
         var library = new Folder { Id = Guid.NewGuid(), Name = "Musique" };
@@ -236,10 +256,19 @@ public sealed class MusicLoudnessTests
         var albums = tracks
             .Select((track, i) => (track, album: i / PerAlbum))
             .GroupBy(x => x.album)
-            .Select(g => (Id: Guid.NewGuid(), Tracks: g.Select(x => x.track).ToArray()))
+            .Select(g => (Id: Guid.NewGuid(), Name: $"album {g.Key}", Tracks: g.Select(x => x.track).ToArray()))
             .ToList();
 
-        var byAlbum = albums.ToDictionary(a => a.Id, a => a.Tracks);
+        foreach (var album in albums)
+        {
+            foreach (var track in album.Tracks)
+            {
+                track.Album = album.Name;
+            }
+        }
+
+        var everyTrack = albums.SelectMany(a => a.Tracks).ToList();
+        var names = albums.ToDictionary(a => a.Id, a => a.Name);
 
         var manager = Substitute.For<ILibraryManager>();
         manager.GetContentType(library).Returns(Jellyfin.Data.Enums.CollectionType.music);
@@ -260,7 +289,7 @@ public sealed class MusicLoudnessTests
             if (kind == BaseItemKind.MusicAlbum)
             {
                 return albums
-                    .Select(BaseItem (a) => new MusicAlbum { Id = a.Id, Name = "album" })
+                    .Select(BaseItem (a) => new MusicAlbum { Id = a.Id, Name = a.Name })
                     .ToList();
             }
 
@@ -270,8 +299,14 @@ public sealed class MusicLoudnessTests
                 query.AlbumIds.Length <= ReplayGainAudit.AlbumBatchSize,
                 $"asked for {query.AlbumIds.Length} albums at once");
 
-            return query.AlbumIds
-                .SelectMany(id => byAlbum.TryGetValue(id, out var t) ? t : [])
+            // The name join carries no scope of its own, so the walk has to ask for one.
+            Assert.Equal(library.Id, query.ParentId);
+            Assert.True(query.Recursive, "a track query must be recursive to be scoped at all");
+
+            var wanted = query.AlbumIds.Select(id => names[id]).ToHashSet(StringComparer.Ordinal);
+
+            return everyTrack
+                .Where(t => t.Album is not null && wanted.Contains(t.Album))
                 .Cast<BaseItem>()
                 .ToList();
         });

@@ -139,8 +139,9 @@ public sealed class ReplayGainAudit
             {
                 _logger.LogInformation(
                     "{Library}: walked {Walked} tracks through its albums, the server counts "
-                    + "{Claimed}. The difference is tracks that belong to no album; they are not "
-                    + "reported as missing a value, because they were never examined.",
+                    + "{Claimed}. Fewer means tracks belonging to no album, which are not reported "
+                    + "as missing a value because they were never examined. More would mean the "
+                    + "walk is counting something twice.",
                     library.Name,
                     tracks,
                     claimed);
@@ -203,16 +204,32 @@ public sealed class ReplayGainAudit
         var fromTag = 0;
         var measured = 0;
 
+        // AlbumIds is a name join, not an identifier filter: the server resolves the ids to album
+        // NAMES and matches every track whose Album string equals one of them. Two albums sharing
+        // a name on either side of a batch boundary each bring back the tracks of both, so a track
+        // could be counted twice -- and the query carries no library scope of its own, so a track
+        // from another music library could be counted at all.
+        var seen = new HashSet<Guid>();
+
         foreach (var batch in albumIds.Chunk(AlbumBatchSize))
         {
             cancellationToken.ThrowIfCancellationRequested();
 
             foreach (var item in _library.GetItemList(new InternalItemsQuery
             {
+                ParentId = libraryId,
+                Recursive = true,
                 AlbumIds = batch,
                 IncludeItemTypes = [BaseItemKind.Audio],
             }))
             {
+                cancellationToken.ThrowIfCancellationRequested();
+
+                if (!seen.Add(item.Id))
+                {
+                    continue;
+                }
+
                 tracks++;
 
                 // The order mirrors the server's own: a track whose tag was read is never measured,

@@ -38,8 +38,35 @@ paging a library costs O(n²). At 400 000 tracks in pages of 1 000 that is tens 
 discarded rows — a design that works on a test library and destroys a real one.
 
 Walk by album instead: albums are cheap (`MusicAlbum` carries `[RequiresSourceSerialisation]`, so it
-is mapped from columns), and their tracks come back in one query per batch via `AlbumIds`, which
-compiles to the same `ParentId IN (...)` predicate. One linear pass, no offset.
+is mapped from columns), and their tracks come back in one query per batch via `AlbumIds`. One
+linear pass, no offset.
+
+## `AlbumIds` is a name join, not an identifier filter
+
+This file previously claimed `AlbumIds` "compiles to the same `ParentId IN (...)` predicate". That
+was wrong, and both audits were built on it. `BaseItemRepository.TranslateQuery.cs:586-589`:
+
+```csharp
+var subQuery = context.BaseItems.WhereOneOrMany(filter.AlbumIds, f => f.Id);
+baseQuery = baseQuery.Where(e => subQuery.Any(f => f.Name == e.Album));
+```
+
+The ids are resolved to album **names**, and every track whose `Album` string equals one of them
+matches. Two consequences, both of which produced wrong figures:
+
+- **Homonyms across a batch boundary double-count.** Two albums called `Live` in different batches
+  each bring back the tracks of both. Forty thousand albums make two hundred boundaries, so on a
+  real library this is arithmetic, not an edge case.
+- **There is no library scope.** A track in another music library whose `Album` tag matches is
+  returned. Per-library figures were wrong without any boundary being involved.
+
+Both audits now pass `ParentId` + `Recursive` **and** keep a `HashSet` of seen track ids. The set is
+the belt: it makes the count right whatever the predicate turns out to do, which is the correct
+posture after getting the predicate wrong once.
+
+The test doubles model the name join. The earlier ones filtered by id — they agreed with the belief
+rather than with the server, so the defect was structurally inexpressible. A double kinder than
+production is not a test.
 
 `Audio` does **not** carry that attribute, so every track row costs a `JsonSerializer.Deserialize`
 of its data blob. Touch tracks once.

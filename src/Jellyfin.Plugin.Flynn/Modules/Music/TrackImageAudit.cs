@@ -215,6 +215,18 @@ public sealed class TrackImageAudit
         var redundant = 0;
         var redundantBytes = 0L;
 
+        // AlbumIds is not the identifier filter its name promises. The server resolves the ids to
+        // album NAMES and matches every track whose Album string equals one of them:
+        //
+        //     var subQuery = context.BaseItems.WhereOneOrMany(filter.AlbumIds, f => f.Id);
+        //     baseQuery = baseQuery.Where(e => subQuery.Any(f => f.Name == e.Album));
+        //
+        // So two albums called "Live" on either side of a batch boundary each bring back the
+        // tracks of both, and the same file is measured twice. Forty thousand albums make two
+        // hundred boundaries; on a real library that is arithmetic, not an edge case. Every track
+        // is therefore counted at most once, whatever the predicate does.
+        var seen = new HashSet<Guid>();
+
         foreach (var batch in albumIds.Chunk(AlbumBatchSize))
         {
             cancellationToken.ThrowIfCancellationRequested();
@@ -226,6 +238,12 @@ public sealed class TrackImageAudit
 
             foreach (var track in _library.GetItemList(new InternalItemsQuery
             {
+                // Scoped, because the name join carries no scope of its own: a track in another
+                // music library whose Album tag matches would otherwise land in this library's
+                // figure. Recursive is what makes ParentId reach past the artists that are a music
+                // library's direct children.
+                ParentId = libraryId,
+                Recursive = true,
                 AlbumIds = batch,
                 IncludeItemTypes = [BaseItemKind.Audio],
             }))
@@ -235,6 +253,11 @@ public sealed class TrackImageAudit
                 // stats between two checkpoints, which is long enough that Cancel does nothing and
                 // the task's own runtime limit overshoots.
                 cancellationToken.ThrowIfCancellationRequested();
+
+                if (!seen.Add(track.Id))
+                {
+                    continue;
+                }
 
                 var cover = StoredCover(track, metadataRoot);
                 if (cover is null)

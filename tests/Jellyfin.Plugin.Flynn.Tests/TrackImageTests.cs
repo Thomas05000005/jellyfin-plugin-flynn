@@ -204,6 +204,41 @@ public sealed class TrackImageTests
         Assert.Equal(Albums, library.RedundantImages);
     }
 
+    /// <summary>
+    /// Two albums that happen to share a name -- "Greatest Hits", "Live", an eponymous record --
+    /// landing either side of a batch boundary.
+    /// <para>
+    /// Because the server joins on the album NAME, each batch returns the tracks of both albums.
+    /// Without a guard the same file is counted twice, and the figure promises bytes that deleting
+    /// anything would not free. Forty thousand albums make two hundred boundaries, so on a real
+    /// library this is not an edge case, it is arithmetic.
+    /// </para>
+    /// </summary>
+    [Fact]
+    public void TwoAlbumsSharingANameAcrossABatchBoundary_AreCountedOnce()
+    {
+        var fixture = new Fixture();
+
+        // One album per batch position, so the two homonyms cannot land in the same batch.
+        var first = Guid.NewGuid();
+        fixture.Track(first, "/config/metadata/library/aa/1/Primary.jpg", 70_000, albumName: "Live");
+        for (var i = 0; i < TrackImageAudit.AlbumBatchSize; i++)
+        {
+            fixture.Track(Guid.NewGuid(), $"/config/metadata/library/f{i}/x/Primary.jpg", 1_000);
+        }
+
+        var second = Guid.NewGuid();
+        fixture.Track(second, "/config/metadata/library/bb/1/Primary.jpg", 70_000, albumName: "Live");
+
+        var library = Assert.Single(fixture.Build().Run(CancellationToken.None));
+
+        Assert.Equal(TrackImageAudit.AlbumBatchSize + 2, library.TracksWithImage);
+        Assert.Equal((TrackImageAudit.AlbumBatchSize * 1_000L) + 140_000L, library.TotalBytes);
+
+        // The two homonyms sit in different folders, so neither is a copy of the other.
+        Assert.Equal(0, library.RedundantImages);
+    }
+
     private static Audio TrackWithCover(string path) => new()
     {
         Id = Guid.NewGuid(),
@@ -216,28 +251,47 @@ public sealed class TrackImageTests
     /// <summary>
     /// One music library, one album per distinct folder, and a filesystem that knows the size of
     /// every path the fixture was told about.
+    /// <para>
+    /// The library manager models what the server actually does with <c>AlbumIds</c>, which is not
+    /// what its name suggests. <c>BaseItemRepository.TranslateQuery</c> resolves the ids to album
+    /// NAMES and then matches every track whose <c>Album</c> string equals one of them:
+    /// </para>
+    /// <code>
+    /// var subQuery = context.BaseItems.WhereOneOrMany(filter.AlbumIds, f =&gt; f.Id);
+    /// baseQuery = baseQuery.Where(e =&gt; subQuery.Any(f =&gt; f.Name == e.Album));
+    /// </code>
+    /// <para>
+    /// An earlier version of this fixture filtered by id, which is the semantics the module's own
+    /// notes claimed. It agreed with the belief rather than with the server, so the double counting
+    /// that belief caused was structurally inexpressible here. A test double that is kinder than
+    /// production is not a test.
+    /// </para>
     /// </summary>
     private sealed class Fixture
     {
         private readonly Dictionary<string, long> _sizes = new(StringComparer.OrdinalIgnoreCase);
         private readonly Dictionary<Guid, List<Audio>> _byFolder = [];
+        private readonly Dictionary<Guid, string> _albumNames = [];
 
-        public Fixture Track(Guid folder, string path, long length, int width = 1000, int height = 1000)
+        public Fixture Track(
+            Guid folder, string path, long length, int width = 1000, int height = 1000,
+            string? albumName = null)
         {
             _sizes[path] = length;
-            return Add(folder, path, width, height);
+            return Add(folder, path, width, height, albumName);
         }
 
         /// <summary>Records a cover on the item without giving it a file on disk.</summary>
         /// <param name="folder">The folder the track sits in.</param>
         /// <param name="path">Where the cover claims to be.</param>
         /// <returns>The fixture.</returns>
-        public Fixture Missing(Guid folder, string path) => Add(folder, path, 1000, 1000);
+        public Fixture Missing(Guid folder, string path) => Add(folder, path, 1000, 1000, null);
 
         public TrackImageAudit Build()
         {
             var library = new Folder { Id = Guid.NewGuid(), Name = "Musique" };
             var albums = _byFolder.Keys.ToList();
+            var everyTrack = _byFolder.Values.SelectMany(t => t).ToList();
 
             var manager = Substitute.For<ILibraryManager>();
             manager.GetContentType(library).Returns(CollectionType.music);
@@ -253,15 +307,26 @@ public sealed class TrackImageTests
 
                 if (kind == BaseItemKind.MusicAlbum)
                 {
-                    return albums.Select(BaseItem (id) => new MusicAlbum { Id = id }).ToList();
+                    return albums
+                        .Select(BaseItem (id) => new MusicAlbum { Id = id, Name = _albumNames[id] })
+                        .ToList();
                 }
 
                 Assert.True(
                     query.AlbumIds.Length <= TrackImageAudit.AlbumBatchSize,
                     $"asked for {query.AlbumIds.Length} albums at once");
 
-                return query.AlbumIds
-                    .SelectMany(id => _byFolder.TryGetValue(id, out var t) ? t : [])
+                // The server applies no library scope of its own to a name join, so a walk that
+                // does not ask for one silently reaches other libraries.
+                Assert.Equal(library.Id, query.ParentId);
+                Assert.True(query.Recursive, "a track query must be recursive to be scoped at all");
+
+                var names = query.AlbumIds
+                    .Select(id => _albumNames[id])
+                    .ToHashSet(StringComparer.Ordinal);
+
+                return everyTrack
+                    .Where(t => t.Album is not null && names.Contains(t.Album))
                     .Cast<BaseItem>()
                     .ToList();
             });
@@ -282,7 +347,7 @@ public sealed class TrackImageTests
                 manager, paths, files, NullLogger<TrackImageAudit>.Instance);
         }
 
-        private Fixture Add(Guid folder, string path, int width, int height)
+        private Fixture Add(Guid folder, string path, int width, int height, string? albumName)
         {
             if (!_byFolder.TryGetValue(folder, out var tracks))
             {
@@ -290,8 +355,12 @@ public sealed class TrackImageTests
                 _byFolder[folder] = tracks;
             }
 
+            // Distinct by default, so an album name only collides when a test asks it to.
+            _albumNames[folder] = albumName ?? _albumNames.GetValueOrDefault(folder, folder.ToString("N"));
+
             var track = TrackWithCover(path);
             track.ParentId = folder;
+            track.Album = _albumNames[folder];
             track.ImageInfos[0].Width = width;
             track.ImageInfos[0].Height = height;
             tracks.Add(track);
