@@ -8,7 +8,18 @@
 3. Write `docs/release-notes/v0.6.0.manifest.txt` — **one paragraph**, the blurb a stranger sees in
    the plugin catalogue before deciding to install. This is the only description Jellyfin ever
    shows for the version.
-4. Commit, tag `v0.6.0`, push both.
+4. Commit, then **push `main` and confirm it landed**, and only then tag `v0.6.0` and push the tag.
+
+## Push main before the tag, as two commands
+
+The release job checks out `main`, not the tag — the tag only selects which version to build. So a
+tag pointing at a commit that is not on remote `main` builds the wrong tree.
+
+`git push origin main --tags` is the trap: if `main` is rejected — because the previous release's
+own manifest commit is not merged locally — **git pushes the tag anyway**. The release then runs
+against stale `main` and preflight refuses it with a version mismatch. That has happened here. The
+preflight message now names this cause, but the fix is to push in two steps and look at the result
+of the first.
 
 **Do not touch `manifest.json`.** It has exactly one author: the release workflow.
 

@@ -70,11 +70,17 @@ jobs:
 
           # The assembly version is what the server reports forever after install, and the ETag
           # that busts the browser cache is built from it.
+          # This job checks out main, not the tag: the tag only selects the version. So a version
+          # mismatch here almost always means main was never pushed, and the usual cause is
+          # `git push origin main --tags` with main rejected -- git pushes the tag anyway.
           csproj = Path("src/Jellyfin.Plugin.Flynn/Jellyfin.Plugin.Flynn.csproj").read_text()
           for field in ("AssemblyVersion", "FileVersion"):
               found = re.search(rf"<{field}>([^<]+)</{field}>", csproj).group(1)
               if found != four:
-                  raise SystemExit(f"{field} is {found}, tag says {four}")
+                  raise SystemExit(
+                      f"main has {field} {found}, tag says {four}. This job builds main, so the "
+                      f"commit carrying {four} has to be on main before the tag is pushed. "
+                      f"Push main first, confirm it landed, then push the tag.")
 
           # Fails loudly if the catalogue blurb is missing or empty. It is the only description a
           # stranger sees before installing.
