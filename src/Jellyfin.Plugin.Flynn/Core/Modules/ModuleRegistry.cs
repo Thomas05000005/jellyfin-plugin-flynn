@@ -49,6 +49,34 @@ public sealed class ModuleRegistry
     public IReadOnlyList<IFlynnModule> Modules => _modules;
 
     /// <summary>
+    /// Whether a module is currently switched on.
+    /// <para>
+    /// A module the admin has never touched falls back to its own default, not to off: the absence
+    /// of a saved preference is "not asked yet", not "asked and declined".
+    /// </para>
+    /// <para>
+    /// It lives here rather than at each call site because two callers disagreeing about what
+    /// "enabled" means is how a scheduled task ends up doing hours of work for a card nobody is
+    /// shown. An unknown id is off, since nothing can act on it.
+    /// </para>
+    /// </summary>
+    /// <param name="saved">The admin's saved toggles, from the plugin configuration.</param>
+    /// <param name="moduleId">The module id.</param>
+    /// <returns>True when the module should run.</returns>
+    public bool IsEnabled(IReadOnlyList<Configuration.ModuleToggle> saved, string moduleId)
+    {
+        ArgumentNullException.ThrowIfNull(saved);
+
+        var module = _modules.FirstOrDefault(m => m.Id == moduleId);
+        if (module is null)
+        {
+            return false;
+        }
+
+        return saved.FirstOrDefault(m => m.Id == moduleId)?.Enabled ?? module.EnabledByDefault;
+    }
+
+    /// <summary>
     /// Builds one card per module, concurrently, isolating failures.
     /// </summary>
     /// <param name="isEnabled">

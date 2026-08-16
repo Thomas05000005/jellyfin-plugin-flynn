@@ -124,16 +124,24 @@ object published). Which one "duplicate" means has to be chosen up front, becaus
 produces hundreds of false positives on a complete discography and destroys the admin's trust on
 the first screen they ever see.
 
-## Known cost, not yet paid down
+## One walk, and only for what is switched on
 
-`MusicAuditTask` walks the library **twice** a night: `ReplayGainAudit.Run` and
-`TrackImageAudit.Run` each issue the same album query and then the same `AlbumIds` batches. Since
-`Audio` carries no `[RequiresSourceSerialisation]`, every track row costs a JSON deserialisation of
-its data blob — so a 223 000-track library pays roughly 447 000 of them instead of 223 000.
+`MusicWalk` makes a single pass and feeds every `ITrackCollector` that asked for it. Both audits are
+collectors, so with both modules on the library is read once rather than twice — `Audio` carries no
+`[RequiresSourceSerialisation]`, so every track row costs a JSON deserialisation, and a 223 000-track
+library was paying 447 000 of them.
 
-The fix is one walk feeding two collectors. It is deliberately not folded into the release that
-introduced the second audit: it means reshaping two classes covered by some thirty tests, and that
-does not belong in the same commit as a correctness fix.
+`MusicAuditTask` builds the collector list from `ModuleRegistry.IsEnabled`. A module that is off is
+not collected, and **when both are off nothing is read at all** — not even the list of music
+libraries. Before this, a disabled module still paid for its own full walk every night to produce a
+figure nobody would be shown.
+
+The walk owns the three things that were each got wrong once: the library scope, the deduplication,
+and where cancellation is checked. Collectors see distinct, in-scope tracks and nothing else.
+
+**The cost of sharing a pass is coupling**, and it is paid for: a collector that throws is dropped
+from the walk and the others finish their night. Cancellation is passed straight through, so a
+cancelled task stops rather than quietly shedding every collector one by one.
 
 ## Measured and abandoned
 

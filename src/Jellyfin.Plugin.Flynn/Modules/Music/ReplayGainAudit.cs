@@ -82,26 +82,18 @@ public sealed record LibraryLoudness(
 /// never measured. Coverage is the union of the two, never their sum over one track.
 /// </para>
 /// </summary>
-public sealed class ReplayGainAudit
+public sealed class ReplayGainAudit : ITrackCollector
 {
-    /// <summary>
-    /// How many albums are asked about at once.
-    /// <para>
-    /// Tracks are fetched by album rather than paged with a start index, and that is the whole
-    /// difference between this finishing and not. <c>StartIndex</c> becomes a real SQL
-    /// <c>OFFSET</c>, applied after a <c>DISTINCT</c> over the full entity and an <c>ORDER BY</c>,
-    /// so the engine produces and throws away every row before the offset: walking a library in
-    /// pages costs O(n squared). At four hundred thousand tracks in pages of a thousand that is
-    /// tens of billions of discarded rows. Batching by album ids is one linear pass instead.
-    /// </para>
-    /// <para>
-    /// Kept well under SQLite's bound parameter limit, since each id is one variable.
-    /// </para>
-    /// </summary>
-    internal const int AlbumBatchSize = 200;
+    /// <summary>How many albums are asked about at once. See <see cref="MusicWalk"/>.</summary>
+    internal const int AlbumBatchSize = MusicWalk.AlbumBatchSize;
 
     private readonly ILibraryManager _library;
     private readonly ILogger<ReplayGainAudit> _logger;
+
+    private readonly List<LibraryLoudness> _results = [];
+    private int _tracks;
+    private int _fromTag;
+    private int _measured;
 
     /// <summary>Initializes a new instance of the <see cref="ReplayGainAudit"/> class.</summary>
     /// <param name="library">The server's library manager.</param>
@@ -112,55 +104,80 @@ public sealed class ReplayGainAudit
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
     }
 
-    /// <summary>Audits every music library.</summary>
+    /// <summary>Gets what the last walk found, one entry per music library.</summary>
+    internal IReadOnlyList<LibraryLoudness> Results => _results;
+
+    /// <summary>Audits every music library, on a walk of its own.</summary>
     /// <param name="cancellationToken">Cancellation token.</param>
     /// <returns>One result per music library.</returns>
     public IReadOnlyList<LibraryLoudness> Run(CancellationToken cancellationToken)
     {
-        var results = new List<LibraryLoudness>();
-
-        foreach (var library in MusicLibraries())
-        {
-            cancellationToken.ThrowIfCancellationRequested();
-
-            var (tracks, fromTag, measured) = CountValues(library.Id, cancellationToken);
-
-            // What the server thinks it holds, against what walking the albums actually reached.
-            // A track that belongs to no album is invisible to the walk, and a silent shortfall
-            // would read as "these are missing a value" when they were never looked at.
-            var claimed = _library.GetCount(new InternalItemsQuery
-            {
-                ParentId = library.Id,
-                IncludeItemTypes = [BaseItemKind.Audio],
-                Recursive = true,
-            });
-
-            if (claimed != tracks)
-            {
-                _logger.LogInformation(
-                    "{Library}: walked {Walked} tracks through its albums, the server counts "
-                    + "{Claimed}. Fewer means tracks belonging to no album, which are not reported "
-                    + "as missing a value because they were never examined. More would mean the "
-                    + "walk is counting something twice.",
-                    library.Name,
-                    tracks,
-                    claimed);
-            }
-
-            results.Add(new LibraryLoudness(
-                library.Id, library.Name, ScanEnabledFor(library), tracks, fromTag, measured));
-        }
-
-        return results;
+        MusicWalk.Run(_library, _logger, [this], cancellationToken);
+        return _results;
     }
 
-    /// <summary>
-    /// Finds the libraries a music module should look at.
-    /// <para>
-    /// Queried rather than read off <c>RootFolder.Children</c>, so this goes through the interface
-    /// like everything else and can be exercised without standing up a server.
-    /// </para>
-    /// </summary>
+    /// <inheritdoc />
+    public void Starting() => _results.Clear();
+
+    /// <inheritdoc />
+    public void Begin(BaseItem library)
+    {
+        _tracks = 0;
+        _fromTag = 0;
+        _measured = 0;
+    }
+
+    /// <inheritdoc />
+    public void Visit(BaseItem track)
+    {
+        ArgumentNullException.ThrowIfNull(track);
+
+        _tracks++;
+
+        // The order mirrors the server's own: a track whose tag was read is never measured, so
+        // counting the tag first is what keeps one track from counting twice.
+        if (track.NormalizationGain.HasValue)
+        {
+            _fromTag++;
+        }
+        else if (track.LUFS.HasValue)
+        {
+            _measured++;
+        }
+    }
+
+    /// <inheritdoc />
+    public void Finish(BaseItem library, int tracksSeen)
+    {
+        ArgumentNullException.ThrowIfNull(library);
+
+        // What the server thinks it holds, against what walking the albums actually reached. A
+        // track that belongs to no album is invisible to the walk, and a silent shortfall would
+        // read as "these are missing a value" when they were never looked at.
+        var claimed = _library.GetCount(new InternalItemsQuery
+        {
+            ParentId = library.Id,
+            IncludeItemTypes = [BaseItemKind.Audio],
+            Recursive = true,
+        });
+
+        if (claimed != _tracks)
+        {
+            _logger.LogInformation(
+                "{Library}: walked {Walked} tracks through its albums, the server counts "
+                + "{Claimed}. Fewer means tracks belonging to no album, which are not reported "
+                + "as missing a value because they were never examined. More would mean the "
+                + "walk is counting something twice.",
+                library.Name,
+                _tracks,
+                claimed);
+        }
+
+        _results.Add(new LibraryLoudness(
+            library.Id, library.Name, ScanEnabledFor(library), _tracks, _fromTag, _measured));
+    }
+
+    /// <summary>Finds the libraries a music module should look at.</summary>
     /// <returns>The music libraries.</returns>
     internal IReadOnlyList<BaseItem> MusicLibraries() => Music.MusicLibraries.Of(_library);
 
@@ -180,71 +197,5 @@ public sealed class ReplayGainAudit
             _logger.LogWarning(ex, "Could not read library options for {Library}.", library.Name);
             return false;
         }
-    }
-
-    private (int Tracks, int FromTag, int Measured) CountValues(
-        Guid libraryId, CancellationToken cancellationToken)
-    {
-        // MusicAlbum carries RequiresSourceSerialisation, so albums come back without a JSON parse
-        // per row. Audio does not, which is the other reason to touch tracks once and only once.
-        //
-        // The ids are materialised and the entities dropped immediately: chunking a lazy Select
-        // over the list would keep every album entity rooted from the first batch to the last.
-        var albumIds = _library
-            .GetItemList(new InternalItemsQuery
-            {
-                ParentId = libraryId,
-                IncludeItemTypes = [BaseItemKind.MusicAlbum],
-                Recursive = true,
-            })
-            .Select(a => a.Id)
-            .ToArray();
-
-        var tracks = 0;
-        var fromTag = 0;
-        var measured = 0;
-
-        // AlbumIds is a name join, not an identifier filter: the server resolves the ids to album
-        // NAMES and matches every track whose Album string equals one of them. Two albums sharing
-        // a name on either side of a batch boundary each bring back the tracks of both, so a track
-        // could be counted twice -- and the query carries no library scope of its own, so a track
-        // from another music library could be counted at all.
-        var seen = new HashSet<Guid>();
-
-        foreach (var batch in albumIds.Chunk(AlbumBatchSize))
-        {
-            cancellationToken.ThrowIfCancellationRequested();
-
-            foreach (var item in _library.GetItemList(new InternalItemsQuery
-            {
-                ParentId = libraryId,
-                Recursive = true,
-                AlbumIds = batch,
-                IncludeItemTypes = [BaseItemKind.Audio],
-            }))
-            {
-                cancellationToken.ThrowIfCancellationRequested();
-
-                if (!seen.Add(item.Id))
-                {
-                    continue;
-                }
-
-                tracks++;
-
-                // The order mirrors the server's own: a track whose tag was read is never measured,
-                // so counting the tag first is what keeps one track from counting twice.
-                if (item.NormalizationGain.HasValue)
-                {
-                    fromTag++;
-                }
-                else if (item.LUFS.HasValue)
-                {
-                    measured++;
-                }
-            }
-        }
-
-        return (tracks, fromTag, measured);
     }
 }

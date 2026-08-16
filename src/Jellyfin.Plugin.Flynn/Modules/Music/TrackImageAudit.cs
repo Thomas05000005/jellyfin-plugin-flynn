@@ -1,4 +1,3 @@
-using Jellyfin.Data.Enums;
 using MediaBrowser.Controller;
 using MediaBrowser.Controller.Entities;
 using MediaBrowser.Controller.Library;
@@ -56,22 +55,21 @@ public sealed record LibraryTrackImages(
 /// no effect at all on music tracks. Turning it on or off changes nothing here.
 /// </para>
 /// </summary>
-public sealed class TrackImageAudit
+public sealed class TrackImageAudit : ITrackCollector
 {
-    /// <summary>
-    /// How many albums are asked about at once.
-    /// <para>
-    /// Tracks are fetched by album rather than paged with a start index. <c>StartIndex</c> becomes
-    /// a real SQL <c>OFFSET</c> applied after a <c>DISTINCT</c> over the full entity, so paging a
-    /// library costs O(n squared); batching by album ids is one linear pass.
-    /// </para>
-    /// </summary>
-    internal const int AlbumBatchSize = 200;
+    /// <summary>How many albums are asked about at once. See <see cref="MusicWalk"/>.</summary>
+    internal const int AlbumBatchSize = MusicWalk.AlbumBatchSize;
 
     private readonly ILibraryManager _library;
     private readonly IServerApplicationPaths _paths;
     private readonly IFileSystem _files;
     private readonly ILogger<TrackImageAudit> _logger;
+
+    private readonly List<LibraryTrackImages> _results = [];
+    private readonly Dictionary<Guid, List<(long Length, int Width, int Height)>> _byFolder = [];
+    private string _metadataRoot = string.Empty;
+    private int _count;
+    private long _bytes;
 
     /// <summary>Initializes a new instance of the <see cref="TrackImageAudit"/> class.</summary>
     /// <param name="library">The server's library manager.</param>
@@ -90,38 +88,92 @@ public sealed class TrackImageAudit
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
     }
 
-    /// <summary>Audits every music library.</summary>
+    /// <summary>Gets what the last walk found, one entry per music library.</summary>
+    internal IReadOnlyList<LibraryTrackImages> Results => _results;
+
+    /// <summary>Audits every music library, on a walk of its own.</summary>
     /// <param name="cancellationToken">Cancellation token.</param>
     /// <returns>One result per music library.</returns>
     public IReadOnlyList<LibraryTrackImages> Run(CancellationToken cancellationToken)
     {
-        var results = new List<LibraryTrackImages>();
+        MusicWalk.Run(_library, _logger, [this], cancellationToken);
+        return _results;
+    }
 
-        foreach (var library in MusicLibraries.Of(_library))
+    /// <inheritdoc />
+    public void Starting()
+    {
+        _results.Clear();
+        _metadataRoot = _paths.InternalMetadataPath;
+    }
+
+    /// <inheritdoc />
+    public void Begin(BaseItem library)
+    {
+        _byFolder.Clear();
+        _count = 0;
+        _bytes = 0;
+    }
+
+    /// <inheritdoc />
+    public void Visit(BaseItem track)
+    {
+        var cover = StoredCover(track, _metadataRoot);
+        if (cover is null)
         {
-            cancellationToken.ThrowIfCancellationRequested();
-
-            var measured = Measure(library.Id, cancellationToken);
-
-            _logger.LogDebug(
-                "{Library}: {Count} track covers in the metadata folder, {Bytes} bytes, of which "
-                + "{Redundant} are copies worth {RedundantBytes} bytes.",
-                library.Name,
-                measured.Count,
-                measured.Bytes,
-                measured.Redundant,
-                measured.RedundantBytes);
-
-            results.Add(new LibraryTrackImages(
-                library.Id,
-                library.Name,
-                measured.Count,
-                measured.Bytes,
-                measured.Redundant,
-                measured.RedundantBytes));
+            return;
         }
 
-        return results;
+        var length = LengthOf(cover.Path);
+        if (length <= 0)
+        {
+            // Recorded on the item but gone from disk, or unreadable. Counting it would promise
+            // bytes that cannot be reclaimed.
+            return;
+        }
+
+        _count++;
+        _bytes += length;
+
+        // Grouped by the folder the track sits in rather than by the album, so a multi-disc release
+        // counts its copies per disc. That is the conservative direction: two discs that really do
+        // carry different art are never merged into one false duplicate.
+        if (!_byFolder.TryGetValue(track.ParentId, out var covers))
+        {
+            covers = [];
+            _byFolder[track.ParentId] = covers;
+        }
+
+        covers.Add((length, cover.Width, cover.Height));
+    }
+
+    /// <inheritdoc />
+    public void Finish(BaseItem library, int tracksSeen)
+    {
+        ArgumentNullException.ThrowIfNull(library);
+
+        var redundant = 0;
+        var redundantBytes = 0L;
+        foreach (var covers in _byFolder.Values)
+        {
+            var (images, copyBytes) = CopiesWithin(covers);
+            redundant += images;
+            redundantBytes += copyBytes;
+        }
+
+        _logger.LogDebug(
+            "{Library}: {Count} track covers in the metadata folder, {Bytes} bytes, of which "
+            + "{Redundant} are copies worth {RedundantBytes} bytes.",
+            library.Name,
+            _count,
+            _bytes,
+            redundant,
+            redundantBytes);
+
+        _results.Add(new LibraryTrackImages(
+            library.Id, library.Name, _count, _bytes, redundant, redundantBytes));
+
+        _byFolder.Clear();
     }
 
     /// <summary>
@@ -187,113 +239,6 @@ public sealed class TrackImageAudit
         }
 
         return (images, bytes);
-    }
-
-    private (int Count, long Bytes, int Redundant, long RedundantBytes) Measure(
-        Guid libraryId, CancellationToken cancellationToken)
-    {
-        var metadataRoot = _paths.InternalMetadataPath;
-
-        // MusicAlbum carries RequiresSourceSerialisation, so albums come back without a JSON parse
-        // per row. Audio does not, which is why tracks are touched once and only once.
-        //
-        // The ids are materialised and the entities dropped immediately. Chunking a lazy Select
-        // over the list would keep it rooted for the whole walk, and forty thousand album entities
-        // held from the first batch to the last is tens of megabytes retained to read a Guid.
-        var albumIds = _library
-            .GetItemList(new InternalItemsQuery
-            {
-                ParentId = libraryId,
-                IncludeItemTypes = [BaseItemKind.MusicAlbum],
-                Recursive = true,
-            })
-            .Select(album => album.Id)
-            .ToArray();
-
-        var count = 0;
-        var bytes = 0L;
-        var redundant = 0;
-        var redundantBytes = 0L;
-
-        // AlbumIds is not the identifier filter its name promises. The server resolves the ids to
-        // album NAMES and matches every track whose Album string equals one of them:
-        //
-        //     var subQuery = context.BaseItems.WhereOneOrMany(filter.AlbumIds, f => f.Id);
-        //     baseQuery = baseQuery.Where(e => subQuery.Any(f => f.Name == e.Album));
-        //
-        // So two albums called "Live" on either side of a batch boundary each bring back the
-        // tracks of both, and the same file is measured twice. Forty thousand albums make two
-        // hundred boundaries; on a real library that is arithmetic, not an edge case. Every track
-        // is therefore counted at most once, whatever the predicate does.
-        var seen = new HashSet<Guid>();
-
-        foreach (var batch in albumIds.Chunk(AlbumBatchSize))
-        {
-            cancellationToken.ThrowIfCancellationRequested();
-
-            // Grouped by the folder the tracks sit in rather than by the album id, so a multi-disc
-            // release counts its copies per disc. That is the conservative direction: two discs
-            // that really do carry different art are never merged into one false duplicate.
-            var byFolder = new Dictionary<Guid, List<(long Length, int Width, int Height)>>();
-
-            foreach (var track in _library.GetItemList(new InternalItemsQuery
-            {
-                // Scoped, because the name join carries no scope of its own: a track in another
-                // music library whose Album tag matches would otherwise land in this library's
-                // figure. Recursive is what makes ParentId reach past the artists that are a music
-                // library's direct children.
-                ParentId = libraryId,
-                Recursive = true,
-                AlbumIds = batch,
-                IncludeItemTypes = [BaseItemKind.Audio],
-            }))
-            {
-                // Checked per track, not per batch. This loop is where every filesystem call
-                // happens: two hundred albums is around a thousand tracks and a thousand blocking
-                // stats between two checkpoints, which is long enough that Cancel does nothing and
-                // the task's own runtime limit overshoots.
-                cancellationToken.ThrowIfCancellationRequested();
-
-                if (!seen.Add(track.Id))
-                {
-                    continue;
-                }
-
-                var cover = StoredCover(track, metadataRoot);
-                if (cover is null)
-                {
-                    continue;
-                }
-
-                var length = LengthOf(cover.Path);
-                if (length <= 0)
-                {
-                    // Recorded on the item but gone from disk, or unreadable. Counting it would
-                    // promise bytes that cannot be reclaimed.
-                    continue;
-                }
-
-                count++;
-                bytes += length;
-
-                if (!byFolder.TryGetValue(track.ParentId, out var covers))
-                {
-                    covers = [];
-                    byFolder[track.ParentId] = covers;
-                }
-
-                covers.Add((length, cover.Width, cover.Height));
-            }
-
-            foreach (var covers in byFolder.Values)
-            {
-                var (images, copyBytes) = CopiesWithin(covers);
-                redundant += images;
-                redundantBytes += copyBytes;
-            }
-        }
-
-        return (count, bytes, redundant, redundantBytes);
     }
 
     private long LengthOf(string path)

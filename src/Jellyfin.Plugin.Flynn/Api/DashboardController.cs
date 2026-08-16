@@ -60,13 +60,10 @@ public sealed class DashboardController : ControllerBase
     public async Task<ActionResult<DashboardDto>> GetModules(CancellationToken cancellationToken)
     {
         var strings = FlynnStrings.ForCulture(RequestCulture.For(Request));
-        var enabled = _config.Current.Modules;
+        var saved = _config.Current.Modules;
 
-        // A module the admin has never touched falls back to its own default, not to off. The
-        // absence of a saved preference is "not asked yet", not "asked and declined".
         var cards = await _modules.BuildCardsAsync(
-            id => enabled.FirstOrDefault(m => m.Id == id)?.Enabled
-                  ?? _modules.Modules.First(m => m.Id == id).EnabledByDefault,
+            id => _modules.IsEnabled(saved, id),
             cancellationToken).ConfigureAwait(false);
 
         var dtos = cards.Select(card =>
